@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
-from app.models.job import JobStatus, JobResponse, JobDownloadsResponse, QualityOption
+from app.models.job import JobStatus, JobResponse, JobDownloadsResponse, QualityOption, AspectRatioOption
 from app.models.video import VideoMetadata, SegmentInfo
 from app.services.download.youtube import YouTubeDownloader
 from app.services.metadata.ffprobe_service import FFprobeService
@@ -21,11 +21,20 @@ from app.core.config import settings
 logger = logging.getLogger("yt_splitter")
 
 class JobState:
-    def __init__(self, job_id: str, url: str, parts: int, quality: QualityOption, channel: Optional[str] = None):
+    def __init__(
+        self,
+        job_id: str,
+        url: str,
+        parts: int,
+        quality: QualityOption,
+        aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL,
+        channel: Optional[str] = None
+    ):
         self.job_id = job_id
         self.url = url
         self.parts = parts
         self.quality = quality
+        self.aspect_ratio = aspect_ratio
         self.channel = channel
         self.status = JobStatus.PENDING
         self.progress = 0.0
@@ -58,13 +67,20 @@ class JobManager:
         self.branding_service = BrandingService()
         self.zipper = ZipService()
 
-    def create_job(self, url: str, parts: int, quality: QualityOption, channel: Optional[str] = None) -> JobResponse:
+    def create_job(
+        self,
+        url: str,
+        parts: int,
+        quality: QualityOption,
+        aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL,
+        channel: Optional[str] = None
+    ) -> JobResponse:
         # Validate channel profile if specified
         if channel:
             self.channel_service.validate_channel_assets(channel)
 
         job_id = str(uuid.uuid4())[:8]
-        state = JobState(job_id, url, parts, quality, channel)
+        state = JobState(job_id, url, parts, quality, aspect_ratio, channel)
         self.jobs[job_id] = state
 
         # Schedule background processing task and store task reference
@@ -199,19 +215,23 @@ class JobManager:
 
             final_clip_paths = generated_clip_paths
 
-            # 4. BRANDING STAGE (70% -> 85%) (If channel selected)
-            if state.channel:
+            # 4. BRANDING & DIMENSION TRANSFORMATION STAGE (70% -> 85%)
+            if state.channel or state.aspect_ratio != AspectRatioOption.ORIGINAL:
                 state.status = JobStatus.BRANDING
-                state.message = f"Applying Intro & Outro branding for profile '{state.channel}'..."
+                state.message = f"Applying aspect ratio ({state.aspect_ratio.value}) and branding..."
                 state.progress = 70.0
                 state.updated_at = datetime.now(timezone.utc)
 
-                profile = self.channel_service.get_channel(state.channel)
-                root_dir = self.channel_service.root_dir
+                intro_path = None
+                outro_path = None
+                prefix = "Clip"
 
-                intro_path = (root_dir / profile.intro) if profile.intro else None
-                outro_path = (root_dir / profile.outro) if profile.outro else None
-                prefix = profile.filename_prefix or profile.id
+                if state.channel:
+                    profile = self.channel_service.get_channel(state.channel)
+                    root_dir = self.channel_service.root_dir
+                    intro_path = (root_dir / profile.intro) if profile.intro else None
+                    outro_path = (root_dir / profile.outro) if profile.outro else None
+                    prefix = profile.filename_prefix or profile.id
 
                 branded_dir = job_dir / "branded"
                 branded_clip_paths = []
@@ -226,7 +246,8 @@ class JobManager:
                         clip_path=raw_clip,
                         output_path=branded_output,
                         intro_path=intro_path,
-                        outro_path=outro_path
+                        outro_path=outro_path,
+                        aspect_ratio=state.aspect_ratio
                     )
                     branded_clip_paths.append(branded_output)
 
@@ -237,7 +258,7 @@ class JobManager:
                     # Update progress
                     frac = part_num / total_clips
                     state.progress = 70.0 + (frac * 15.0)
-                    state.message = f"Applying branding to clip {part_num}/{total_clips}..."
+                    state.message = f"Processing clip {part_num}/{total_clips} ({state.aspect_ratio.value})..."
                     state.updated_at = datetime.now(timezone.utc)
 
                 # Cleanup intermediate raw split clips to save disk space

@@ -28,6 +28,7 @@ async def create_job(request: JobCreateRequest):
             url=clean_url,
             parts=request.parts,
             quality=request.quality,
+            aspect_ratio=request.aspect_ratio,
             channel=request.channel
         )
     except (KeyError, FileNotFoundError) as e:

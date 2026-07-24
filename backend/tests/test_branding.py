@@ -69,3 +69,31 @@ def test_branding_service_concat(tmp_path: Path):
 
     assert result_path.exists()
     assert result_path.stat().st_size > 0
+
+def test_branding_service_aspect_ratio_9_16(tmp_path: Path):
+    import asyncio
+    from app.models.job import AspectRatioOption
+    service = BrandingService()
+
+    from app.services.processing.ffmpeg_service import get_ffmpeg_executable
+    import subprocess
+
+    test_clip = tmp_path / "test_9_16_src.mp4"
+    output_clip = tmp_path / "test_9_16_out.mp4"
+    ffmpeg_bin = get_ffmpeg_executable()
+
+    subprocess.run([
+        ffmpeg_bin, "-y",
+        "-f", "lavfi", "-i", "color=c=blue:s=1280x720:d=2",
+        "-f", "lavfi", "-i", "sine=f=440:d=2",
+        "-c:v", "libx264", "-c:a", "aac", "-shortest", str(test_clip)
+    ], check=True)
+
+    result_path = asyncio.run(service.add_intro_outro(
+        clip_path=test_clip,
+        output_path=output_clip,
+        aspect_ratio=AspectRatioOption.V_9_16
+    ))
+
+    assert result_path.exists()
+    assert result_path.stat().st_size > 0

@@ -8,16 +8,31 @@ from app.services.metadata.ffprobe_service import FFprobeService
 
 logger = logging.getLogger("yt_splitter")
 
+from app.models.job import AspectRatioOption
+
 def _exec_subprocess(cmd: List[str]) -> tuple[int, str, str]:
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout_str = proc.stdout.decode('utf-8', errors='ignore')
     stderr_str = proc.stderr.decode('utf-8', errors='ignore')
     return proc.returncode, stdout_str, stderr_str
 
+def get_video_filter(aspect_ratio: AspectRatioOption) -> str:
+    val = aspect_ratio.value if isinstance(aspect_ratio, AspectRatioOption) else str(aspect_ratio)
+    if val == "9:16":
+        return "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30"
+    elif val == "16:9":
+        return "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30"
+    elif val == "1:1":
+        return "scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080,setsar=1,fps=30"
+    elif val == "4:5":
+        return "scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,fps=30"
+    else:
+        return "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30"
+
 class BrandingService:
     """
-    Independent service responsible for prepending an Intro and appending an Outro
-    to a video clip using FFmpeg complex filter concatenation and robust fallback.
+    Independent service responsible for prepending an Intro, appending an Outro,
+    and transforming video aspect ratio dimensions (9:16, 16:9, 1:1, 4:5).
     """
     def __init__(self):
         self.ffmpeg_bin = get_ffmpeg_executable()
@@ -35,16 +50,18 @@ class BrandingService:
         clip_path: Path,
         output_path: Path,
         intro_path: Optional[Path] = None,
-        outro_path: Optional[Path] = None
+        outro_path: Optional[Path] = None,
+        aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL
     ) -> Path:
         """
-        Concatenates [Intro (if present)] + [Clip] + [Outro (if present)] into output_path.
+        Concatenates [Intro (if present)] + [Clip] + [Outro (if present)] into output_path
+        while applying the requested target aspect ratio dimension.
         """
         if not clip_path.exists():
             raise FileNotFoundError(f"Input clip file not found: {clip_path}")
 
-        # If no intro and no outro provided, simply copy clip to output_path
-        if not intro_path and not outro_path:
+        # If no intro, no outro, and aspect_ratio is original, copy clip to output_path
+        if not intro_path and not outro_path and aspect_ratio == AspectRatioOption.ORIGINAL:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(clip_path.read_bytes())
             return output_path
@@ -61,6 +78,8 @@ class BrandingService:
         count = len(inputs)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        v_filter = get_video_filter(aspect_ratio)
+
         # Primary approach: FFmpeg complex filter concatenation
         cmd = [self.ffmpeg_bin, "-y"]
         for inp in inputs:
@@ -74,8 +93,7 @@ class BrandingService:
             a_tag = f"a{idx}"
             
             filter_parts.append(
-                f"[{idx}:v]scale=1280:720:force_original_aspect_ratio=decrease,"
-                f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[{v_tag}];"
+                f"[{idx}:v]{v_filter}[{v_tag}];"
             )
 
             has_audio = await self._has_audio(inputs[idx])
@@ -105,7 +123,7 @@ class BrandingService:
             str(output_path)
         ])
 
-        logger.info(f"Applying branding (Intro/Outro) to {clip_path.name} -> {output_path.name}")
+        logger.info(f"Applying branding/aspect_ratio ({aspect_ratio}) to {clip_path.name} -> {output_path.name}")
         returncode, stdout, stderr = await asyncio.to_thread(_exec_subprocess, cmd)
 
         if returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
@@ -114,9 +132,14 @@ class BrandingService:
         logger.warning(f"Complex filter concatenation failed for {clip_path.name}: {stderr[:300]}. Attempting fallback re-encode method...")
 
         # Fallback method: Pre-normalize inputs into temporary files then concat
-        return await self._fallback_concat(inputs, output_path)
+        return await self._fallback_concat(inputs, output_path, aspect_ratio)
 
-    async def _fallback_concat(self, inputs: List[Path], output_path: Path) -> Path:
+    async def _fallback_concat(
+        self,
+        inputs: List[Path],
+        output_path: Path,
+        aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL
+    ) -> Path:
         """
         Fallback concatenation method for unusual video formats.
         Normalizes inputs individually to temp TS files and concats.
@@ -124,6 +147,7 @@ class BrandingService:
         temp_dir = output_path.parent / "_temp_branding"
         temp_dir.mkdir(parents=True, exist_ok=True)
         ts_files = []
+        v_filter = get_video_filter(aspect_ratio)
 
         try:
             for idx, inp in enumerate(inputs):
@@ -139,7 +163,7 @@ class BrandingService:
                     cmd.extend(["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"])
 
                 cmd.extend([
-                    "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+                    "-vf", v_filter,
                     "-c:v", "libx264", "-preset", "ultrafast",
                     "-c:a", "aac", "-ar", "44100", "-ac", "2",
                     "-f", "mpegts",

@@ -4,7 +4,7 @@ import { JobForm } from './components/JobForm';
 import { ProgressView } from './components/ProgressView';
 import { ResultsView } from './components/ResultsView';
 import { Footer } from './components/Footer';
-import type { JobResponse, JobDownloadsResponse, QualityOption } from './types/job';
+import type { JobResponse, JobDownloadsResponse, QualityOption, AspectRatioOption } from './types/job';
 import { createSplitJob, fetchJobStatus, fetchJobDownloads, cancelSplitJob } from './services/api';
 
 const ACTIVE_JOB_KEY = 'splittube_active_job_id';
@@ -64,11 +64,17 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [currentJob]);
 
-  const handleCreateJob = async (url: string, parts: number, quality: QualityOption, channel?: string) => {
+  const handleCreateJob = async (
+    url: string,
+    parts: number,
+    quality: QualityOption,
+    aspectRatio: AspectRatioOption,
+    channel?: string
+  ) => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const job = await createSplitJob(url, parts, quality, channel);
+      const job = await createSplitJob(url, parts, quality, aspectRatio, channel);
       setCurrentJob(job);
       setDownloads(null);
       localStorage.setItem(ACTIVE_JOB_KEY, job.job_id);

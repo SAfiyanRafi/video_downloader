@@ -66,6 +66,12 @@ def handle_tools_list(request_id):
                                 "enum": ["best", "1080p", "720p", "audio_only"],
                                 "default": "best"
                             },
+                            "aspect_ratio": {
+                                "type": "string",
+                                "description": "Target video dimension aspect ratio: original, 9:16 (Shorts/TikTok), 16:9, 1:1 (Square), 4:5 (Portrait)",
+                                "enum": ["original", "9:16", "16:9", "1:1", "4:5"],
+                                "default": "original"
+                            },
                             "channel": {
                                 "type": "string",
                                 "description": "Optional channel profile ID for intro/outro branding (e.g. rhymes4ever, cut_clips)"
@@ -95,11 +101,12 @@ def handle_tools_call(request_id, params):
     url = arguments.get("url")
     parts = arguments.get("parts", 4)
     quality = arguments.get("quality", "best")
+    aspect_ratio = arguments.get("aspect_ratio", "original")
     channel = arguments.get("channel")
 
     try:
         # 1. Create Job
-        payload = {"url": url, "parts": parts, "quality": quality}
+        payload = {"url": url, "parts": parts, "quality": quality, "aspect_ratio": aspect_ratio}
         if channel:
             payload["channel"] = channel
 

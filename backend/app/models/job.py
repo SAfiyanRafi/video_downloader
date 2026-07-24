@@ -10,6 +10,13 @@ class QualityOption(str, Enum):
     P720 = "720p"
     AUDIO_ONLY = "audio_only"
 
+class AspectRatioOption(str, Enum):
+    ORIGINAL = "original"
+    V_9_16 = "9:16"
+    H_16_9 = "16:9"
+    S_1_1 = "1:1"
+    P_4_5 = "4:5"
+
 class JobStatus(str, Enum):
     PENDING = "pending"
     DOWNLOADING = "downloading"
@@ -24,6 +31,7 @@ class JobCreateRequest(BaseModel):
     url: str = Field(..., description="YouTube Video URL")
     parts: int = Field(default=4, ge=2, le=50, description="Number of equal parts to split into")
     quality: QualityOption = Field(default=QualityOption.BEST, description="Desired download resolution quality")
+    aspect_ratio: AspectRatioOption = Field(default=AspectRatioOption.ORIGINAL, description="Target aspect ratio dimension (e.g. 9:16 for Shorts/Reels, 16:9, 1:1)")
     channel: Optional[str] = Field(default=None, description="Optional channel profile ID for intro/outro branding")
 
 class JobResponse(BaseModel):

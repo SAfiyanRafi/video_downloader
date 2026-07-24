@@ -1,5 +1,7 @@
 export type QualityOption = 'best' | '1080p' | '720p' | 'audio_only';
 
+export type AspectRatioOption = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
+
 export type JobStatus =
   | 'pending'
   | 'downloading'

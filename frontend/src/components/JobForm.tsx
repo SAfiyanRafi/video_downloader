@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle, Tv } from 'lucide-react';
-import type { QualityOption, ChannelProfile } from '../types/job';
+import { Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle, Tv, Crop, Smartphone, Monitor, Square, Maximize2 } from 'lucide-react';
+import type { QualityOption, AspectRatioOption, ChannelProfile } from '../types/job';
 import { fetchChannels } from '../services/api';
 
 interface JobFormProps {
-  onSubmit: (url: string, parts: number, quality: QualityOption, channel?: string) => void;
+  onSubmit: (url: string, parts: number, quality: QualityOption, aspectRatio: AspectRatioOption, channel?: string) => void;
   isLoading: boolean;
   error?: string | null;
 }
@@ -13,6 +13,7 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const [url, setUrl] = useState('');
   const [parts, setParts] = useState(4);
   const [quality, setQuality] = useState<QualityOption>('best');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('original');
   const [channel, setChannel] = useState<string>('');
   const [channels, setChannels] = useState<ChannelProfile[]>([]);
   const [urlTouched, setUrlTouched] = useState(false);
@@ -33,7 +34,7 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
     e.preventDefault();
     setUrlTouched(true);
     if (!isUrlValid) return;
-    onSubmit(url.trim(), parts, quality, channel || undefined);
+    onSubmit(url.trim(), parts, quality, aspectRatio, channel || undefined);
   };
 
   const presetParts = [2, 4, 6, 8, 10, 12, 16, 20];
@@ -203,6 +204,53 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
                 <div className="text-[11px] text-gray-500 mt-0.5">{q.desc}</div>
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Target Video Dimension / Aspect Ratio Module */}
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs sm:text-sm font-semibold text-gray-200 flex items-center space-x-2">
+              <Crop className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Target Aspect Ratio & Dimensions</span>
+            </label>
+            <span className="text-[11px] text-emerald-400 font-mono font-semibold">Shorts / Reels Ready</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[
+              { id: 'original', label: 'Native / Original', ratio: 'Source', desc: 'Unchanged aspect ratio', icon: Maximize2 },
+              { id: '9:16', label: '9:16 Vertical Short', ratio: '1080x1920', desc: 'Shorts, TikTok, Reels', icon: Smartphone },
+              { id: '16:9', label: '16:9 Widescreen', ratio: '1920x1080', desc: 'YouTube & Desktop TV', icon: Monitor },
+              { id: '1:1', label: '1:1 Square', ratio: '1080x1080', desc: 'Instagram Feed Posts', icon: Square },
+              { id: '4:5', label: '4:5 Portrait', ratio: '1080x1350', desc: 'Mobile Feed Portrait', icon: Smartphone },
+            ].map((ar) => {
+              const IconComp = ar.icon;
+              const isSelected = aspectRatio === ar.id;
+              return (
+                <button
+                  key={ar.id}
+                  type="button"
+                  onClick={() => setAspectRatio(ar.id as AspectRatioOption)}
+                  className={`p-3.5 rounded-xl border text-left transition-all min-h-[76px] flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-emerald-500/15 border-emerald-500 text-white ring-1 ring-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                      : 'bg-slate-900/70 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200'
+                  } focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none`}
+                >
+                  <div className="flex items-center justify-between">
+                    <IconComp className={`w-4 h-4 ${isSelected ? 'text-emerald-400' : 'text-gray-500'}`} />
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-950/80 border border-gray-800 text-gray-300">
+                      {ar.ratio}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-gray-200 mt-2">{ar.label}</div>
+                    <div className="text-[10px] text-gray-500 truncate">{ar.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
