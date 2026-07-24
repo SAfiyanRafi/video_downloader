@@ -1,0 +1,214 @@
+import asyncio
+import uuid
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, Optional
+
+from app.models.job import JobStatus, JobResponse, JobDownloadsResponse, QualityOption
+from app.models.video import VideoMetadata, SegmentInfo
+from app.services.download.youtube import YouTubeDownloader
+from app.services.metadata.ffprobe_service import FFprobeService
+from app.services.split.equal_split_service import EqualSplitService
+from app.services.processing.ffmpeg_service import FFmpegService
+from app.services.storage.local_storage import LocalStorageProvider
+from app.services.zip.zip_service import ZipService
+from app.core.config import settings
+
+logger = logging.getLogger("yt_splitter")
+
+class JobState:
+    def __init__(self, job_id: str, url: str, parts: int, quality: QualityOption):
+        self.job_id = job_id
+        self.url = url
+        self.parts = parts
+        self.quality = quality
+        self.status = JobStatus.PENDING
+        self.progress = 0.0
+        self.message = "Job queued"
+        self.error: Optional[str] = None
+        self.created_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
+        self.metadata: Optional[VideoMetadata] = None
+        self.segments: list[SegmentInfo] = []
+        self.zip_filename: Optional[str] = None
+
+class JobManager:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(JobManager, cls).__new__(cls)
+            cls._instance._init_manager()
+        return cls._instance
+
+    def _init_manager(self):
+        self.jobs: Dict[str, JobState] = {}
+        self.storage = LocalStorageProvider()
+        self.downloader = YouTubeDownloader()
+        self.ffprobe = FFprobeService()
+        self.splitter = EqualSplitService()
+        self.ffmpeg = FFmpegService()
+        self.zipper = ZipService()
+
+    def create_job(self, url: str, parts: int, quality: QualityOption) -> JobResponse:
+        job_id = str(uuid.uuid4())[:8]
+        state = JobState(job_id, url, parts, quality)
+        self.jobs[job_id] = state
+
+        # Schedule background processing task
+        asyncio.create_task(self._process_job(job_id))
+
+        return self.get_job_response(job_id)
+
+    def get_job_state(self, job_id: str) -> Optional[JobState]:
+        return self.jobs.get(job_id)
+
+    def get_job_response(self, job_id: str) -> JobResponse:
+        state = self.jobs.get(job_id)
+        if not state:
+            raise KeyError(f"Job ID {job_id} not found")
+        return JobResponse(
+            job_id=state.job_id,
+            status=state.status,
+            progress=round(state.progress, 1),
+            message=state.message,
+            created_at=state.created_at,
+            updated_at=state.updated_at,
+            error=state.error,
+            metadata=state.metadata
+        )
+
+    def get_job_downloads(self, job_id: str) -> JobDownloadsResponse:
+        state = self.jobs.get(job_id)
+        if not state:
+            raise KeyError(f"Job ID {job_id} not found")
+
+        zip_url = None
+        if state.zip_filename:
+            zip_url = self.storage.get_download_url(job_id, state.zip_filename)
+
+        clips_with_urls: list[SegmentInfo] = []
+        for seg in state.segments:
+            seg_copy = seg.model_copy()
+            seg_copy.download_url = self.storage.get_download_url(job_id, seg.filename)
+            clips_with_urls.append(seg_copy)
+
+        return JobDownloadsResponse(
+            job_id=state.job_id,
+            status=state.status,
+            zip_url=zip_url,
+            clips=clips_with_urls,
+            metadata=state.metadata
+        )
+
+    async def _process_job(self, job_id: str):
+        state = self.jobs.get(job_id)
+        if not state:
+            return
+
+        job_dir = self.storage.get_job_directory(job_id)
+
+        try:
+            # 1. DOWNLOADING STAGE (0% -> 40%)
+            state.status = JobStatus.DOWNLOADING
+            state.message = "Downloading video from YouTube..."
+            state.updated_at = datetime.now(timezone.utc)
+
+            def _download_progress(pct: float):
+                # Scale download progress into 0-40% total job progress
+                state.progress = (pct / 100.0) * 40.0
+                state.updated_at = datetime.now(timezone.utc)
+
+            downloaded_video = await self.downloader.download(
+                source=state.url,
+                output_dir=job_dir,
+                quality=state.quality,
+                progress_callback=_download_progress
+            )
+            state.progress = 40.0
+
+            # 2. ANALYZING METADATA STAGE (40% -> 50%)
+            state.status = JobStatus.ANALYZING
+            state.message = "Analyzing video metadata and split markers..."
+            state.progress = 45.0
+            state.updated_at = datetime.now(timezone.utc)
+
+            metadata = await self.ffprobe.get_metadata(downloaded_video)
+            state.metadata = metadata
+
+            if metadata.duration <= 0:
+                raise ValueError("Could not determine valid video duration")
+
+            if metadata.duration > settings.MAX_VIDEO_DURATION_SECONDS:
+                raise ValueError(f"Video duration ({metadata.duration:.0f}s) exceeds maximum allowed ({settings.MAX_VIDEO_DURATION_SECONDS}s)")
+
+            # 3. CALCULATE SPLITS & SPLITTING STAGE (50% -> 85%)
+            state.status = JobStatus.SPLITTING
+            state.message = f"Splitting video into {state.parts} equal segments..."
+            state.progress = 50.0
+            state.updated_at = datetime.now(timezone.utc)
+
+            segments = self.splitter.calculate_splits(metadata.duration, state.parts)
+            state.segments = segments
+
+            def _split_progress(done: int, total: int):
+                # Scale splitting progress into 50% -> 85% range
+                frac = done / total
+                state.progress = 50.0 + (frac * 35.0)
+                state.message = f"Splitting clip {done}/{total}..."
+                state.updated_at = datetime.now(timezone.utc)
+
+            clips_dir = job_dir / "clips"
+            generated_clip_paths = await self.ffmpeg.split_video(
+                input_file=downloaded_video,
+                output_dir=clips_dir,
+                segments=segments,
+                progress_callback=_split_progress
+            )
+
+            # Update segment filenames relative to job directory
+            for seg in state.segments:
+                seg.filename = f"clips/{seg.filename}"
+
+            # 4. ZIPPING STAGE (85% -> 99%)
+            state.status = JobStatus.ZIPPING
+            state.message = "Creating ZIP archive of video parts..."
+            state.progress = 90.0
+            state.updated_at = datetime.now(timezone.utc)
+
+            zip_output_path = job_dir / "video_parts.zip"
+            await self.zipper.create_zip_archive(generated_clip_paths, zip_output_path)
+            state.zip_filename = "video_parts.zip"
+
+            # 5. COMPLETED
+            state.status = JobStatus.COMPLETED
+            state.progress = 100.0
+            state.message = "Video splitting completed successfully"
+            state.updated_at = datetime.now(timezone.utc)
+            logger.info(f"Job {job_id} successfully completed.")
+
+        except Exception as e:
+            logger.error(f"Job {job_id} failed: {e}", exc_info=True)
+            state.status = JobStatus.FAILED
+            state.error = str(e)
+            state.message = f"Failed: {e}"
+            state.updated_at = datetime.now(timezone.utc)
+
+    async def auto_cleanup_loop(self):
+        """Periodic background task that cleans up expired job directories."""
+        while True:
+            await asyncio.sleep(settings.CLEANUP_INTERVAL_MINUTES * 60)
+            now = datetime.now(timezone.utc)
+            to_delete = []
+            for j_id, state in list(self.jobs.items()):
+                age_minutes = (now - state.created_at).total_seconds() / 60.0
+                if age_minutes >= settings.JOB_EXPIRATION_MINUTES:
+                    to_delete.append(j_id)
+
+            for j_id in to_delete:
+                logger.info(f"Auto-cleaning expired job: {j_id}")
+                self.storage.cleanup_job(j_id)
+                self.jobs.pop(j_id, None)
+
+job_manager = JobManager()

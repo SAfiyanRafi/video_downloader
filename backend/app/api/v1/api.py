@@ -1,0 +1,7 @@
+from fastapi import APIRouter
+from app.api.v1.endpoints import jobs, mcp
+
+api_router = APIRouter()
+
+api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+api_router.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
