@@ -62,6 +62,17 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ job, onCancel }) => 
               <span>Elapsed: {formatTimer(secondsElapsed)}</span>
             </div>
 
+            {onCancel && job.status === 'failed' && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="min-h-[40px] px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition-all flex items-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              >
+                <XCircle className="w-4 h-4 shrink-0" />
+                <span>Back to Form</span>
+              </button>
+            )}
+
             {onCancel && job.status !== 'completed' && job.status !== 'failed' && (
               <button
                 type="button"
@@ -165,12 +176,29 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ job, onCancel }) => 
         </div>
 
         {job.status === 'failed' && (
-          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start space-x-3 text-red-400 text-xs sm:text-sm">
-            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">Execution Error</p>
-              <p className="text-red-300 mt-1">{job.error || 'An error occurred during video processing.'}</p>
+          <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/30 space-y-4">
+            <div className="flex items-start space-x-3 text-red-400">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-sm sm:text-base">Video Processing Failed</p>
+                <p className="text-red-300 text-xs sm:text-sm mt-1 leading-relaxed">
+                  {job.error || 'An error occurred during video processing.'}
+                </p>
+              </div>
             </div>
+
+            {onCancel && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-red-600/20 transition-all flex items-center justify-center space-x-2 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                >
+                  <XCircle className="w-4 h-4 shrink-0" />
+                  <span>Try Another Video URL</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

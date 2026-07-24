@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
@@ -209,10 +210,26 @@ class JobManager:
             logger.info(f"Job {job_id} successfully completed.")
 
         except Exception as e:
-            logger.error(f"Job {job_id} failed: {e}", exc_info=True)
+            raw_err = str(e)
+            # Strip ANSI terminal codes (e.g. \x1b[0;31m)
+            clean_err = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', raw_err).strip()
+            
+            # Humanize common YouTube / yt-dlp error patterns
+            if "This video is not available" in clean_err or "Video unavailable" in clean_err:
+                friendly_err = "The requested YouTube video is unavailable (it may be private, deleted, or region-restricted)."
+            elif "Private video" in clean_err:
+                friendly_err = "This YouTube video is private and cannot be accessed."
+            elif "Sign in to confirm your age" in clean_err:
+                friendly_err = "This YouTube video is age-restricted and requires authentication."
+            elif "is not a valid URL" in clean_err:
+                friendly_err = "Invalid YouTube URL format."
+            else:
+                friendly_err = clean_err or "An error occurred during video processing."
+
+            logger.error(f"Job {job_id} failed: {clean_err}", exc_info=True)
             state.status = JobStatus.FAILED
-            state.error = str(e)
-            state.message = f"Failed: {e}"
+            state.error = friendly_err
+            state.message = f"Failed: {friendly_err}"
             state.updated_at = datetime.now(timezone.utc)
 
     async def auto_cleanup_loop(self):

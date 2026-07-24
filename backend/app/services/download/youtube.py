@@ -50,6 +50,7 @@ class YouTubeDownloader(BaseDownloader):
             "merge_output_format": "mp4",
             "quiet": True,
             "no_warnings": True,
+            "no_color": True,
             "progress_hooks": [_yt_dlp_progress_hook],
             "ffmpeg_location": ffmpeg_location,
             "overwrites": True
