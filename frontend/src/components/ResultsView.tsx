@@ -68,7 +68,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ downloads, onReset }) 
         {zipUrl && (
           <a
             href={zipUrl}
-            download
+            download="video_parts.zip"
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-heading font-bold text-base shadow-xl shadow-emerald-600/30 hover:shadow-emerald-600/40 transition-all flex items-center justify-center space-x-3 group"
           >
             <Archive className="w-5 h-5 text-white transition-transform group-hover:scale-110" />
@@ -143,7 +145,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ downloads, onReset }) 
                 <div className="flex items-center space-x-2 pt-2">
                   <a
                     href={downloadUrl}
-                    download
+                    download={`part_${clip.part_number.toString().padStart(3, '0')}.mp4`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-rose-600 text-white font-semibold text-xs transition-all flex items-center justify-center space-x-2 group/btn border border-gray-700 hover:border-rose-500"
                   >
                     <Download className="w-3.5 h-3.5" />

@@ -57,7 +57,7 @@ async def get_job_downloads(job_id: str):
         )
 
 @router.get("/{job_id}/files/{file_path:path}")
-def download_job_file(job_id: str, file_path: str):
+async def download_job_file(job_id: str, file_path: str):
     """
     Serves individual clip files or ZIP archives for a specific job.
     Includes security checks against path traversal.
@@ -73,8 +73,14 @@ def download_job_file(job_id: str, file_path: str):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
     filename = target_file.name
+    media_type = "application/octet-stream"
+    if filename.endswith(".zip"):
+        media_type = "application/zip"
+    elif filename.endswith(".mp4"):
+        media_type = "video/mp4"
+
     return FileResponse(
         path=target_file,
         filename=filename,
-        media_type="application/octet-stream"
+        media_type=media_type
     )
