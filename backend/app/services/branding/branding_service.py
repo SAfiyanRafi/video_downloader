@@ -8,6 +8,12 @@ from app.services.metadata.ffprobe_service import FFprobeService
 
 logger = logging.getLogger("yt_splitter")
 
+def _exec_subprocess(cmd: List[str]) -> tuple[int, str, str]:
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout_str = proc.stdout.decode('utf-8', errors='ignore')
+    stderr_str = proc.stderr.decode('utf-8', errors='ignore')
+    return proc.returncode, stdout_str, stderr_str
+
 class BrandingService:
     """
     Independent service responsible for prepending an Intro and appending an Outro
@@ -75,7 +81,7 @@ class BrandingService:
             has_audio = await self._has_audio(inputs[idx])
             if has_audio:
                 filter_parts.append(
-                    f"[{idx}:a]aresample=44100,aformat=channel_layouts=stereo[{a_tag}];"
+                    f"[{idx}:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[{a_tag}];"
                 )
             else:
                 filter_parts.append(
@@ -100,18 +106,12 @@ class BrandingService:
         ])
 
         logger.info(f"Applying branding (Intro/Outro) to {clip_path.name} -> {output_path.name}")
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
+        returncode, stdout, stderr = await asyncio.to_thread(_exec_subprocess, cmd)
 
-        if process.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
+        if returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
             return output_path
 
-        err_msg = stderr.decode('utf-8', errors='ignore')
-        logger.warning(f"Complex filter concatenation failed for {clip_path.name}: {err_msg[:300]}. Attempting fallback re-encode method...")
+        logger.warning(f"Complex filter concatenation failed for {clip_path.name}: {stderr[:300]}. Attempting fallback re-encode method...")
 
         # Fallback method: Pre-normalize inputs into temporary files then concat
         return await self._fallback_concat(inputs, output_path)
@@ -146,8 +146,7 @@ class BrandingService:
                     str(ts_file)
                 ])
 
-                proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-                await proc.communicate()
+                await asyncio.to_thread(_exec_subprocess, cmd)
                 ts_files.append(ts_file)
 
             # Concat demuxer string
@@ -159,11 +158,10 @@ class BrandingService:
                 str(output_path)
             ]
 
-            proc = await asyncio.create_subprocess_exec(*final_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-            _, err = await proc.communicate()
+            returncode, _, err = await asyncio.to_thread(_exec_subprocess, final_cmd)
 
-            if proc.returncode != 0:
-                raise RuntimeError(f"Fallback branding failed: {err.decode('utf-8', errors='ignore')[:300]}")
+            if returncode != 0:
+                raise RuntimeError(f"Fallback branding failed: {err[:300]}")
 
             return output_path
         finally:
