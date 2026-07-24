@@ -142,7 +142,8 @@ class JobManager:
             error=state.error,
             metadata=state.metadata,
             url=state.url,
-            parts=state.parts
+            parts=state.parts,
+            channel=state.channel
         )
 
     def get_job_downloads(self, job_id: str) -> JobDownloadsResponse:
@@ -238,7 +239,7 @@ class JobManager:
             # 4. BRANDING & DIMENSION TRANSFORMATION STAGE (70% -> 85%)
             if state.channel or state.aspect_ratio != AspectRatioOption.ORIGINAL:
                 state.status = JobStatus.BRANDING
-                state.message = f"Applying aspect ratio ({state.aspect_ratio.value}) and branding..."
+                state.message = f"Applying branding & aspect ratio ({state.aspect_ratio.value})..."
                 state.progress = 70.0
                 state.updated_at = datetime.now(timezone.utc)
 
@@ -247,10 +248,26 @@ class JobManager:
                 prefix = "Media"
 
                 if state.channel:
+                    logger.info(f"[Job {job_id}] Selected channel: '{state.channel}'. Loading profile...")
                     profile = self.channel_service.get_channel(state.channel)
                     root_dir = self.channel_service.root_dir
-                    intro_path = (root_dir / profile.intro) if profile.intro else None
-                    outro_path = (root_dir / profile.outro) if profile.outro else None
+
+                    if profile.intro:
+                        intro_path = root_dir / profile.intro
+                        if not intro_path.exists():
+                            err_msg = f"Intro file missing for channel '{state.channel}' at {intro_path}"
+                            logger.error(f"[Job {job_id}] {err_msg}")
+                            raise FileNotFoundError(err_msg)
+                        logger.info(f"[Job {job_id}] Intro found: {intro_path}")
+
+                    if profile.outro:
+                        outro_path = root_dir / profile.outro
+                        if not outro_path.exists():
+                            err_msg = f"Outro file missing for channel '{state.channel}' at {outro_path}"
+                            logger.error(f"[Job {job_id}] {err_msg}")
+                            raise FileNotFoundError(err_msg)
+                        logger.info(f"[Job {job_id}] Outro found: {outro_path}")
+
                     prefix = profile.filename_prefix or profile.id
 
                 branded_dir = job_dir / "branded"
@@ -270,6 +287,7 @@ class JobManager:
 
                     branded_output = branded_dir / branded_filename
 
+                    logger.info(f"[Job {job_id}] Branding clip {part_num}/{total_clips} with Intro/Outro -> {branded_filename}...")
                     await self.branding_service.add_intro_outro(
                         clip_path=raw_clip,
                         output_path=branded_output,
@@ -280,16 +298,21 @@ class JobManager:
                         padding_mode=state.padding_mode,
                         crop_fill=state.crop_fill
                     )
+                    
+                    if not branded_output.exists() or branded_output.stat().st_size == 0:
+                        raise RuntimeError(f"Branding failed: Output clip {branded_filename} was not created.")
+
+                    logger.info(f"[Job {job_id}] Branding completed for clip {part_num}/{total_clips}: {branded_filename} ({branded_output.stat().st_size} bytes)")
                     branded_clip_paths.append(branded_output)
 
-                    # Update SegmentInfo records
+                    # Update SegmentInfo records to point strictly to the branded output clip
                     if idx < len(state.segments):
                         state.segments[idx].filename = f"branded/{branded_filename}"
 
                     # Update progress
                     frac = part_num / total_clips
                     state.progress = 70.0 + (frac * 15.0)
-                    state.message = f"Processing clip {part_num}/{total_clips} ({state.aspect_ratio.value})..."
+                    state.message = f"Branding clip {part_num}/{total_clips} ({state.aspect_ratio.value})..."
                     state.updated_at = datetime.now(timezone.utc)
 
                 # Cleanup intermediate raw split clips to save disk space
@@ -297,11 +320,13 @@ class JobManager:
                     for raw_c in generated_clip_paths:
                         if raw_c.exists():
                             raw_c.unlink()
+                    logger.info(f"[Job {job_id}] Intermediate raw split clips cleaned up successfully.")
                 except Exception as clean_err:
-                    logger.warning(f"Failed to cleanup intermediate split clips: {clean_err}")
+                    logger.warning(f"[Job {job_id}] Failed to cleanup intermediate split clips: {clean_err}")
 
                 final_clip_paths = branded_clip_paths
             else:
+                logger.info(f"[Job {job_id}] No channel branding or aspect ratio change requested. Using raw split clips.")
                 # Update segment filenames relative to job directory
                 for seg in state.segments:
                     seg.filename = f"clips/{seg.filename}"

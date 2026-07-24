@@ -68,6 +68,7 @@ class JobResponse(BaseModel):
     metadata: Optional[VideoMetadata] = None
     url: Optional[str] = None
     parts: Optional[int] = None
+    channel: Optional[str] = None
 
 class JobDownloadsResponse(BaseModel):
     job_id: str
