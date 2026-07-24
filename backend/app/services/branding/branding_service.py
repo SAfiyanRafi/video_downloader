@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 from app.services.processing.ffmpeg_service import get_ffmpeg_executable
+from app.services.metadata.ffprobe_service import FFprobeService
 
 logger = logging.getLogger("yt_splitter")
 
@@ -13,6 +14,14 @@ class BrandingService:
     """
     def __init__(self):
         self.ffmpeg_bin = get_ffmpeg_executable()
+        self.ffprobe_service = FFprobeService()
+
+    async def _has_audio(self, video_path: Path) -> bool:
+        try:
+            meta = await self.ffprobe_service.get_metadata(video_path)
+            return meta.audio_codec is not None
+        except Exception:
+            return True
 
     async def add_intro_outro(
         self,
@@ -56,13 +65,25 @@ class BrandingService:
         for idx in range(count):
             v_tag = f"v{idx}"
             a_tag = f"a{idx}"
+            
+            # Video stream filter
             filter_parts.append(
                 f"[{idx}:v]scale=1920:1080:force_original_aspect_ratio=decrease,"
                 f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[{v_tag}];"
             )
-            filter_parts.append(
-                f"[{idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[{a_tag}];"
-            )
+
+            # Audio stream filter with robust fallback
+            has_audio = await self._has_audio(inputs[idx])
+            if has_audio:
+                filter_parts.append(
+                    f"[{idx}:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[{a_tag}];"
+                )
+            else:
+                # Generate silent audio track if input lacks audio stream
+                filter_parts.append(
+                    f"anullsrc=r=44100:cl=stereo[{a_tag}];"
+                )
+
             concat_inputs.append(f"[{v_tag}][{a_tag}]")
 
         filter_graph = " ".join(filter_parts) + f" {''.join(concat_inputs)}concat=n={count}:v=1:a=1[outv][outa]"
