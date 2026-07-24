@@ -19,20 +19,25 @@ def _exec_subprocess(cmd: List[str]) -> tuple[int, str, str]:
 def get_video_filter(aspect_ratio: AspectRatioOption) -> str:
     val = aspect_ratio.value if isinstance(aspect_ratio, AspectRatioOption) else str(aspect_ratio)
     if val == "9:16":
-        return "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30"
+        # 1080x1920 Vertical Short (Whole Frame Fitted cleanly without cropping)
+        return "scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
     elif val == "16:9":
-        return "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30"
+        # 1920x1080 Landscape Widescreen (Whole Frame Fitted)
+        return "scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
     elif val == "1:1":
-        return "scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080,setsar=1,fps=30"
+        # 1080x1080 Square (Whole Frame Fitted)
+        return "scale=1080:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
     elif val == "4:5":
-        return "scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,fps=30"
+        # 1080x1350 Mobile Portrait (Whole Frame Fitted)
+        return "scale=1080:1350:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1350:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
     else:
-        return "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30"
+        # Original Native Dimensions (Whole Frame Unchanged with High-Fidelity Lanczos Scaling)
+        return "scale=1280:720:force_original_aspect_ratio=decrease:flags=lanczos,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
 
 class BrandingService:
     """
     Independent service responsible for prepending an Intro, appending an Outro,
-    and transforming video aspect ratio dimensions (9:16, 16:9, 1:1, 4:5).
+    and fitting video frames into target aspect ratio dimensions (9:16, 16:9, 1:1, 4:5).
     """
     def __init__(self):
         self.ffmpeg_bin = get_ffmpeg_executable()
@@ -55,7 +60,7 @@ class BrandingService:
     ) -> Path:
         """
         Concatenates [Intro (if present)] + [Clip] + [Outro (if present)] into output_path
-        while applying the requested target aspect ratio dimension.
+        while fitting full video frames into target aspect ratio dimensions cleanly without cropping.
         """
         if not clip_path.exists():
             raise FileNotFoundError(f"Input clip file not found: {clip_path}")
@@ -115,11 +120,10 @@ class BrandingService:
             "-map", "[outv]",
             "-map", "[outa]",
             "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-tune", "fastdecode",
-            "-crf", "22",
+            "-preset", "veryfast",
+            "-crf", "18",
             "-c:a", "aac",
-            "-b:a", "128k",
+            "-b:a", "320k",
             str(output_path)
         ])
 

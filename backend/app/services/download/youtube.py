@@ -25,14 +25,17 @@ class YouTubeDownloader(BaseDownloader):
         output_dir.mkdir(parents=True, exist_ok=True)
         out_template = str(output_dir / "original_video.%(ext)s")
 
-        # Flexible format selector with broad compatibility
-        format_selector = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/bestvideo+bestaudio/best"
-        if quality == QualityOption.P1080:
-            format_selector = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
+        # Format selector prioritizing maximum resolution, bitrate, and best audio/video tracks
+        if quality == QualityOption.BEST:
+            format_selector = "bestvideo+bestaudio/best"
+        elif quality == QualityOption.P1080:
+            format_selector = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/bestvideo+bestaudio/best"
         elif quality == QualityOption.P720:
-            format_selector = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+            format_selector = "bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best"
         elif quality == QualityOption.AUDIO_ONLY:
             format_selector = "bestaudio/best"
+        else:
+            format_selector = "bestvideo+bestaudio/best"
 
         ffmpeg_location = get_ffmpeg_executable()
 
@@ -46,6 +49,7 @@ class YouTubeDownloader(BaseDownloader):
 
         ydl_opts = {
             "format": format_selector,
+            "format_sort": ["res", "fps", "hdr:12", "vcodec:h264", "acodec:m4a", "size", "br"],
             "outtmpl": out_template,
             "merge_output_format": "mp4",
             "quiet": True,
