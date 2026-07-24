@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle,
-  Tv, Crop, Smartphone, Monitor, Square, Maximize2, Sliders, FileText, Image, Folder
+  Tv, Crop, Smartphone, Monitor, Square, Maximize2, Sliders, FileText, Image, Folder, Workflow
 } from 'lucide-react';
 import type {
   QualityOption, AspectRatioOption, ExportPreset, PaddingMode, NamingTemplate, ChannelProfile
 } from '../types/job';
+import type { WorkflowProfile } from '../types/workflow';
 import { fetchChannels } from '../services/api';
+import { fetchWorkflows } from '../services/workflowApi';
 
 interface JobFormProps {
   onSubmit: (
@@ -41,6 +43,8 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const [channel, setChannel] = useState<string>('');
   const [channels, setChannels] = useState<ChannelProfile[]>(DEFAULT_CHANNELS);
   const [urlTouched, setUrlTouched] = useState(false);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<string>('custom');
+  const [workflows, setWorkflows] = useState<WorkflowProfile[]>([]);
 
   useEffect(() => {
     fetchChannels()
@@ -54,7 +58,26 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
       .catch(() => {
         setChannels(DEFAULT_CHANNELS);
       });
+
+    fetchWorkflows().then((data) => {
+      if (data && data.length > 0) {
+        setWorkflows(data);
+      }
+    });
   }, []);
+
+  const handleSelectWorkflow = (wf: WorkflowProfile) => {
+    setSelectedWorkflow(wf.id);
+    if (wf.aspect_ratio === '9:16') {
+      setAspectRatio('9:16');
+      setPaddingMode('blurred');
+      setChannel(''); // Shorts workflow disables intro/outro branding
+    } else if (wf.aspect_ratio === '16:9') {
+      setAspectRatio('16:9');
+      setPaddingMode('black_bars');
+    }
+    setExportPreset(wf.export_preset as ExportPreset);
+  };
 
   const isValidYoutubeUrl = (u: string) => {
     return /^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/.+/i.test(u.trim());
@@ -243,6 +266,42 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
             ))}
           </div>
         </div>
+
+        {/* Workflow Profile Selector */}
+        {workflows.length > 0 && (
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs sm:text-sm font-semibold text-gray-200 flex items-center space-x-2">
+                <Workflow className="w-4 h-4 text-purple-400 shrink-0" />
+                <span>Workflow Profiles (1-Click Automation)</span>
+              </label>
+              <span className="text-[11px] text-purple-400 font-mono font-semibold">Config-Driven</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {workflows.map((wf) => (
+                <button
+                  key={wf.id}
+                  type="button"
+                  onClick={() => handleSelectWorkflow(wf)}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    selectedWorkflow === wf.id
+                      ? 'bg-purple-500/15 border-purple-500 text-white ring-1 ring-purple-500/50 shadow-lg shadow-purple-500/10 font-bold'
+                      : 'bg-slate-900/70 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200'
+                  }`}
+                >
+                  <div className="text-xs font-extrabold text-white flex items-center justify-between">
+                    <span>{wf.display_name}</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950 border border-gray-800 text-purple-300">
+                      {wf.aspect_ratio}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-1 leading-relaxed">{wf.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Target Video Dimension / Aspect Ratio & Padding Mode */}
         <div className="space-y-4 pt-1">
