@@ -40,6 +40,7 @@ class JobState:
         self.progress = 0.0
         self.message = "Job queued"
         self.error: Optional[str] = None
+        self.cancelled = False
         self.created_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
         self.metadata: Optional[VideoMetadata] = None
@@ -93,13 +94,14 @@ class JobManager:
         if not state:
             raise KeyError(f"Job ID {job_id} not found")
 
-        if state.task and not state.task.done():
-            state.task.cancel()
-
+        state.cancelled = True
         state.status = JobStatus.FAILED
         state.error = "Job cancelled by user"
         state.message = "Cancelled by user"
         state.updated_at = datetime.now(timezone.utc)
+
+        if state.task and not state.task.done():
+            state.task.cancel()
 
         # Purge temporary files
         self.storage.cleanup_job(job_id)
@@ -238,6 +240,10 @@ class JobManager:
                 total_clips = len(generated_clip_paths)
 
                 for idx, raw_clip in enumerate(generated_clip_paths):
+                    if state.cancelled or state.status == JobStatus.FAILED:
+                        logger.info(f"Halted branding loop for cancelled job {job_id}")
+                        return
+
                     part_num = idx + 1
                     branded_filename = f"{prefix}_Part_{part_num:02d}.mp4"
                     branded_output = branded_dir / branded_filename

@@ -87,15 +87,18 @@ export const App: React.FC = () => {
 
   const handleCancelJob = async () => {
     if (!currentJob) return;
+    const targetJobId = currentJob.job_id;
+
+    // Immediately clear state to halt frontend polling loop
+    localStorage.removeItem(ACTIVE_JOB_KEY);
+    setCurrentJob(null);
+    setDownloads(null);
+    setError(null);
+
     try {
-      await cancelSplitJob(currentJob.job_id);
+      await cancelSplitJob(targetJobId);
     } catch (err) {
       console.warn('Error cancelling job:', err);
-    } finally {
-      localStorage.removeItem(ACTIVE_JOB_KEY);
-      setCurrentJob(null);
-      setDownloads(null);
-      setError(null);
     }
   };
 
