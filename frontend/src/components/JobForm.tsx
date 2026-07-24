@@ -24,6 +24,11 @@ interface JobFormProps {
   error?: string | null;
 }
 
+const DEFAULT_CHANNELS: ChannelProfile[] = [
+  { id: 'rhymes4ever', display_name: 'Rhymes4ever (Kids Intro & Outro)', filename_prefix: 'Rhymes4ever' },
+  { id: 'cut_clips', display_name: 'Cut_Clips (Shorts Intro & Outro)', filename_prefix: 'Cut_Clips' }
+];
+
 export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) => {
   const [url, setUrl] = useState('');
   const [parts, setParts] = useState(4);
@@ -34,13 +39,21 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const [namingTemplate, setNamingTemplate] = useState<NamingTemplate>('{channel}_Part_{number}');
   const [cropFill, setCropFill] = useState(false);
   const [channel, setChannel] = useState<string>('');
-  const [channels, setChannels] = useState<ChannelProfile[]>([]);
+  const [channels, setChannels] = useState<ChannelProfile[]>(DEFAULT_CHANNELS);
   const [urlTouched, setUrlTouched] = useState(false);
 
   useEffect(() => {
-    fetchChannels().then((data) => {
-      setChannels(data);
-    });
+    fetchChannels()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setChannels(data);
+        } else {
+          setChannels(DEFAULT_CHANNELS);
+        }
+      })
+      .catch(() => {
+        setChannels(DEFAULT_CHANNELS);
+      });
   }, []);
 
   const isValidYoutubeUrl = (u: string) => {
@@ -377,12 +390,12 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
               id="channel-select"
               value={channel}
               onChange={(e) => setChannel(e.target.value)}
-              className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-slate-900 border border-gray-800 focus:border-rose-500 focus:ring-rose-500 text-white text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 transition-all cursor-pointer"
+              className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-slate-900 border border-gray-700 focus:border-rose-500 focus:ring-rose-500 text-white text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 transition-all cursor-pointer shadow-sm"
             >
-              <option value="">None (Standard Split without Intros/Outros)</option>
-              {channels.map((chan) => (
-                <option key={chan.id} value={chan.id}>
-                  ▼ {chan.display_name} (Auto Intro & Outro Branding)
+              <option value="" className="bg-slate-900 text-white py-2">None (Standard Split without Intros/Outros)</option>
+              {(channels.length > 0 ? channels : DEFAULT_CHANNELS).map((chan) => (
+                <option key={chan.id} value={chan.id} className="bg-slate-900 text-white py-2 font-medium">
+                  🎬 {chan.display_name} (Auto Intro & Outro Branding)
                 </option>
               ))}
             </select>
