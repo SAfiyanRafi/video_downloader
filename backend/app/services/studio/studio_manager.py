@@ -82,6 +82,10 @@ class StudioManager:
         job_dir.mkdir(parents=True, exist_ok=True)
 
         try:
+            input_video = Path(req.video_path).resolve()
+            if not input_video.exists():
+                raise FileNotFoundError(f"Input video file not found at {input_video}")
+
             # 1. AUDIO EXTRACTION & SUBTITLE GENERATION (0% -> 40%)
             state.status = "PROCESSING"
             state.progress = 10.0
@@ -139,9 +143,9 @@ class StudioManager:
 
             vf_filters = []
             if req.enable_subtitles and req.subtitle_mode in [SubtitleMode.BURNED_IN, SubtitleMode.BOTH] and ass_path:
-                # Escape Windows path backslashes for FFmpeg ass filter
+                # Escape Windows path backslashes and colon for FFmpeg ass filter
                 clean_ass_path = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
-                vf_filters.append(f"ass={clean_ass_path}")
+                vf_filters.append(f"ass='{clean_ass_path}'")
 
             if vf_filters:
                 cmd.extend(["-vf", ",".join(vf_filters)])
@@ -159,7 +163,9 @@ class StudioManager:
             returncode, _, err = await asyncio.to_thread(_exec_subprocess, cmd)
 
             if returncode != 0:
-                raise RuntimeError(f"FFmpeg render failed: {err[:300]}")
+                err_lines = [line for line in err.splitlines() if line.strip()]
+                tail_err = "\n".join(err_lines[-10:]) if err_lines else err[:300]
+                raise RuntimeError(f"FFmpeg render failed:\n{tail_err}")
 
             state.output_video_path = str(output_video.resolve())
 
