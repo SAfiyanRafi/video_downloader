@@ -52,17 +52,7 @@ class YouTubeDownloader(BaseDownloader):
             "no_warnings": True,
             "progress_hooks": [_yt_dlp_progress_hook],
             "ffmpeg_location": ffmpeg_location,
-            "overwrites": True,
-            "nocheckcertificate": True,
-            "geo_bypass": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android", "web", "mweb", "tv"]
-                }
-            },
-            "http_headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            }
+            "overwrites": True
         }
 
         loop = asyncio.get_running_loop()

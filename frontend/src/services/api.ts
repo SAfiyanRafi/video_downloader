@@ -39,6 +39,23 @@ export async function fetchJobStatus(jobId: string): Promise<JobResponse> {
   }
 }
 
+export async function cancelSplitJob(jobId: string): Promise<JobResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/jobs/${jobId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to cancel job ${jobId}`);
+    }
+    return response.json();
+  } catch (err: any) {
+    if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
+      throw new Error('Backend server disconnected');
+    }
+    throw err;
+  }
+}
+
 export async function fetchJobDownloads(jobId: string): Promise<JobDownloadsResponse> {
   try {
     const response = await fetch(`${API_BASE}/jobs/${jobId}/downloads`);

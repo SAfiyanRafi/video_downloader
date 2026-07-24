@@ -43,6 +43,19 @@ async def get_job_status(job_id: str):
             detail=f"Job ID '{job_id}' not found"
         )
 
+@router.delete("/{job_id}", response_model=JobResponse)
+async def cancel_job(job_id: str):
+    """
+    Cancels an ongoing split job and cleans up any temporary files.
+    """
+    try:
+        return job_manager.cancel_job(job_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job ID '{job_id}' not found"
+        )
+
 @router.get("/{job_id}/downloads", response_model=JobDownloadsResponse)
 async def get_job_downloads(job_id: str):
     """

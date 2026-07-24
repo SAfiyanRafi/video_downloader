@@ -29,3 +29,7 @@ def test_create_job_invalid_parts():
         json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "parts": 100}
     )
     assert response.status_code == 422 or response.status_code == 400
+
+def test_cancel_nonexistent_job():
+    response = client.delete("/api/v1/jobs/invalid_id_999")
+    assert response.status_code == 404

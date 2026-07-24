@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Download, Cpu, Scissors, Archive, CheckCircle2, Clock, Loader2, AlertCircle } from 'lucide-react';
+import { Download, Cpu, Scissors, Archive, CheckCircle2, Clock, Loader2, AlertCircle, XCircle } from 'lucide-react';
 import type { JobResponse, JobStatus } from '../types/job';
 
 interface ProgressViewProps {
   job: JobResponse;
+  onCancel?: () => void;
 }
 
-export const ProgressView: React.FC<ProgressViewProps> = ({ job }) => {
+export const ProgressView: React.FC<ProgressViewProps> = ({ job, onCancel }) => {
   const [secondsElapsed, setSecondsElapsed] = useState(0);
 
   useEffect(() => {
@@ -55,9 +56,23 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ job }) => {
             </h2>
           </div>
 
-          <div className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-gray-800 text-gray-300 font-mono text-xs shrink-0">
-            <Clock className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>Elapsed: {formatTimer(secondsElapsed)}</span>
+          <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-gray-800 text-gray-300 font-mono text-xs">
+              <Clock className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Elapsed: {formatTimer(secondsElapsed)}</span>
+            </div>
+
+            {onCancel && job.status !== 'completed' && job.status !== 'failed' && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="min-h-[40px] px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 font-semibold text-xs transition-all flex items-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                title="Cancel ongoing video split job"
+              >
+                <XCircle className="w-4 h-4 shrink-0" />
+                <span>Cancel Job</span>
+              </button>
+            )}
           </div>
         </div>
 

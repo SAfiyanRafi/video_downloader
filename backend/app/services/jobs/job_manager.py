@@ -32,6 +32,7 @@ class JobState:
         self.metadata: Optional[VideoMetadata] = None
         self.segments: list[SegmentInfo] = []
         self.zip_filename: Optional[str] = None
+        self.task: Optional[asyncio.Task] = None
 
 class JobManager:
     _instance = None
@@ -56,8 +57,27 @@ class JobManager:
         state = JobState(job_id, url, parts, quality)
         self.jobs[job_id] = state
 
-        # Schedule background processing task
-        asyncio.create_task(self._process_job(job_id))
+        # Schedule background processing task and store task reference
+        state.task = asyncio.create_task(self._process_job(job_id))
+
+        return self.get_job_response(job_id)
+
+    def cancel_job(self, job_id: str) -> JobResponse:
+        state = self.jobs.get(job_id)
+        if not state:
+            raise KeyError(f"Job ID {job_id} not found")
+
+        if state.task and not state.task.done():
+            state.task.cancel()
+
+        state.status = JobStatus.FAILED
+        state.error = "Job cancelled by user"
+        state.message = "Cancelled by user"
+        state.updated_at = datetime.now(timezone.utc)
+
+        # Purge temporary files
+        self.storage.cleanup_job(job_id)
+        logger.info(f"Job {job_id} was cancelled by user and cleaned up.")
 
         return self.get_job_response(job_id)
 
