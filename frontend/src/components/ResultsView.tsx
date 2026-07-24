@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Archive, Clock, RefreshCw, Copy, Check } from 'lucide-react';
+import { Download, Archive, Clock, RefreshCw, Copy, Check, Folder } from 'lucide-react';
 import type { JobDownloadsResponse } from '../types/job';
 import { getAbsoluteDownloadUrl } from '../services/api';
 
@@ -78,6 +78,18 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ downloads, onReset }) 
             <Download className="w-5 h-5 text-white ml-auto shrink-0 hidden sm:block" />
           </a>
         )}
+
+        {/* Auto-Saved Folder Banner */}
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center space-x-2 truncate">
+            <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-semibold text-gray-200">Auto-Saved to Desktop:</span>
+            <span className="font-mono text-[11px] text-amber-300 truncate">C:\Users\ABC\OneDrive\Desktop\Youtube\Download\Job_{downloads.job_id}</span>
+          </div>
+          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 shrink-0">
+            Exported
+          </span>
+        </div>
 
         {/* Video Specs Grid (2 cols on mobile, 4 cols on desktop) */}
         {downloads.metadata && (

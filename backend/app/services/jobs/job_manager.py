@@ -341,6 +341,26 @@ class JobManager:
             await self.zipper.create_zip_archive(final_clip_paths, zip_output_path)
             state.zip_filename = "video_parts.zip"
 
+            # Auto-export ZIP and clips to default download directory (C:\Users\ABC\OneDrive\Desktop\Youtube\Download)
+            try:
+                dest_dir = settings.DEFAULT_DOWNLOAD_DIR / f"Job_{job_id}"
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Copy ZIP file
+                if zip_output_path.exists():
+                    dest_zip = dest_dir / f"SplitTube_{job_id}.zip"
+                    dest_zip.write_bytes(zip_output_path.read_bytes())
+                
+                # Copy clips
+                for clip_path in final_clip_paths:
+                    if clip_path.exists():
+                        dest_clip = dest_dir / clip_path.name
+                        dest_clip.write_bytes(clip_path.read_bytes())
+                
+                logger.info(f"[Job {job_id}] Auto-exported ZIP and clips to default download folder: {dest_dir}")
+            except Exception as exp_err:
+                logger.warning(f"[Job {job_id}] Auto-export to default download folder failed: {exp_err}")
+
             # 6. COMPLETED
             state.status = JobStatus.COMPLETED
             state.progress = 100.0

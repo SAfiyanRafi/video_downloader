@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle,
-  Tv, Crop, Smartphone, Monitor, Square, Maximize2, Sliders, FileText, Image
+  Tv, Crop, Smartphone, Monitor, Square, Maximize2, Sliders, FileText, Image, Folder
 } from 'lucide-react';
 import type {
   QualityOption, AspectRatioOption, ExportPreset, PaddingMode, NamingTemplate, ChannelProfile
@@ -402,6 +402,31 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
           </div>
           <p className="text-[11px] text-gray-400">
             Selecting a channel automatically prepends its intro video and appends its outro video to every split segment clip.
+          </p>
+        </div>
+
+        {/* Constant Target Save Location Section */}
+        <div className="p-4 rounded-2xl bg-slate-900/90 border border-gray-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-gray-200 flex items-center space-x-2">
+              <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Target Save Folder (Desktop)</span>
+            </label>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold">
+              Auto-Saved on Completion
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              readOnly
+              value="C:\Users\ABC\OneDrive\Desktop\Youtube\Download"
+              className="w-full min-h-[42px] px-3 py-2 rounded-xl bg-slate-950 border border-gray-800 text-amber-300 font-mono text-xs focus:outline-none"
+            />
+          </div>
+          <p className="text-[11px] text-gray-400">
+            All generated MP4 clips and ZIP archives are automatically saved into this desktop folder upon job completion.
           </p>
         </div>
 
