@@ -5,6 +5,7 @@ import { ProgressView } from './components/ProgressView';
 import { ResultsView } from './components/ResultsView';
 import { Footer } from './components/Footer';
 import { HistoryDrawer } from './components/HistoryDrawer';
+import { StudioDashboard } from './components/studio/StudioDashboard';
 import type { HistoryItem } from './components/HistoryDrawer';
 import type {
   JobResponse, JobDownloadsResponse, QualityOption, AspectRatioOption,
@@ -16,6 +17,7 @@ const ACTIVE_JOB_KEY = 'splittube_active_job_id';
 const HISTORY_KEY = 'splittube_job_history';
 
 export const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'splitter' | 'studio'>('splitter');
   const [currentJob, setCurrentJob] = useState<JobResponse | null>(null);
   const [downloads, setDownloads] = useState<JobDownloadsResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -153,19 +155,29 @@ export const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-gray-100 flex flex-col justify-between selection:bg-rose-500 selection:text-white">
       <div>
-        <Header onOpenHistory={() => setIsHistoryOpen(true)} />
+        <Header
+          onOpenHistory={() => setIsHistoryOpen(true)}
+          activeTab={activeTab}
+          onTabChange={(tab) => setActiveTab(tab)}
+        />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-16">
-          {!currentJob && (
-            <JobForm onSubmit={handleCreateJob} isLoading={isSubmitting} error={error} />
-          )}
+          {activeTab === 'studio' ? (
+            <StudioDashboard />
+          ) : (
+            <>
+              {!currentJob && (
+                <JobForm onSubmit={handleCreateJob} isLoading={isSubmitting} error={error} />
+              )}
 
-          {currentJob && currentJob.status !== 'completed' && (
-            <ProgressView job={currentJob} onCancel={handleCancelJob} />
-          )}
+              {currentJob && currentJob.status !== 'completed' && (
+                <ProgressView job={currentJob} onCancel={handleCancelJob} />
+              )}
 
-          {currentJob && currentJob.status === 'completed' && downloads && (
-            <ResultsView downloads={downloads} onReset={handleReset} />
+              {currentJob && currentJob.status === 'completed' && downloads && (
+                <ResultsView downloads={downloads} onReset={handleReset} />
+              )}
+            </>
           )}
         </main>
       </div>

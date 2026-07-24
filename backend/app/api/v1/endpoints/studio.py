@@ -1,0 +1,42 @@
+from typing import List
+from fastapi import APIRouter, HTTPException, status
+from app.models.studio import StudioJobRequest, StudioJobResponse
+from app.services.studio.studio_manager import studio_manager
+
+router = APIRouter()
+
+@router.post("/jobs", response_model=StudioJobResponse, status_code=status.HTTP_201_CREATED)
+async def create_studio_job(request: StudioJobRequest):
+    """
+    Submits a video for AI subtitle generation, ASS styling burn-in, audio loudness normalization, and enhancement.
+    """
+    try:
+        return studio_manager.create_studio_job(request)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/jobs/{job_id}", response_model=StudioJobResponse)
+async def get_studio_job(job_id: str):
+    """
+    Retrieves status and output paths for a Creator Studio job.
+    """
+    try:
+        return studio_manager.get_studio_job(job_id)
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+@router.get("/jobs", response_model=List[StudioJobResponse])
+async def list_studio_jobs():
+    """
+    Lists all Creator Studio jobs.
+    """
+    return studio_manager.list_studio_jobs()
+
+@router.get("/watch-folder", response_model=List[str])
+async def scan_watch_folder():
+    """
+    Scans the default download directory (C:\\Users\\ABC\\OneDrive\\Desktop\\Youtube\\Download) for input videos.
+    """
+    return studio_manager.scan_watch_folder()

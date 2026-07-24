@@ -3,37 +3,67 @@ import { Scissors, Cpu, ShieldCheck, Menu, X, Code2, BookOpen, History } from 'l
 
 interface HeaderProps {
   onOpenHistory?: () => void;
+  activeTab?: 'splitter' | 'studio';
+  onTabChange?: (tab: 'splitter' | 'studio') => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenHistory }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenHistory, activeTab = 'splitter', onTabChange }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header className="border-b border-gray-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
         {/* Brand Logo & Title */}
-        <a 
-          href="/" 
-          className="flex items-center space-x-3 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-xl p-1"
-          aria-label="SplitTube Pro Home"
-        >
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-rose-600 via-pink-600 to-amber-500 flex items-center justify-center shadow-lg shadow-rose-600/30 group-hover:scale-105 transition-transform">
-            <Scissors className="w-5 h-5 sm:w-6 sm:h-6 text-white transform -rotate-12" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-heading font-extrabold text-lg sm:text-xl md:text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-400">
-                SplitTube Pro
-              </span>
-              <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                Lossless
-              </span>
+        <div className="flex items-center space-x-6">
+          <a 
+            href="/" 
+            className="flex items-center space-x-3 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 rounded-xl p-1"
+            aria-label="Creator Suite Home"
+          >
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-rose-600 via-pink-600 to-amber-500 flex items-center justify-center shadow-lg shadow-rose-600/30 group-hover:scale-105 transition-transform">
+              <Scissors className="w-5 h-5 sm:w-6 sm:h-6 text-white transform -rotate-12" />
             </div>
-            <p className="text-[11px] sm:text-xs text-gray-400 font-medium hidden sm:block">
-              YouTube Video Splitter Platform
-            </p>
-          </div>
-        </a>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-heading font-extrabold text-lg sm:text-xl md:text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-400">
+                  Creator Suite
+                </span>
+                <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  Pro Studio
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-gray-400 font-medium hidden sm:block">
+                Video Splitter & AI Creator Studio Platform
+              </p>
+            </div>
+          </a>
+
+          {/* Ecosystem Tab Switcher */}
+          {onTabChange && (
+            <div className="hidden sm:flex items-center p-1 rounded-xl bg-slate-900 border border-gray-800 text-xs">
+              <button
+                onClick={() => onTabChange('splitter')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                  activeTab === 'splitter'
+                    ? 'bg-rose-600 text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Media Splitter
+              </button>
+              <button
+                onClick={() => onTabChange('studio')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                  activeTab === 'studio'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Creator Studio (AI)
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-4 lg:space-x-6">
