@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import type { SubtitleStylePreset, SubtitleMode, StudioJobResponse } from '../../types/studio';
 import { createStudioJob, fetchStudioJobStatus, scanWatchFolder } from '../../services/studioApi';
+import { AIUploadHelper } from './AIUploadHelper';
 
 export const StudioDashboard: React.FC = () => {
   const [detectedVideos, setDetectedVideos] = useState<string[]>([]);
@@ -339,7 +340,7 @@ export const StudioDashboard: React.FC = () => {
 
                 {/* Completed Output */}
                 {activeJob.status === 'COMPLETED' && activeJob.output_video_path && (
-                  <div className="pt-2 space-y-2">
+                  <div className="pt-2 space-y-4">
                     <div className="text-xs text-emerald-400 font-semibold flex items-center space-x-1.5">
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Upload Ready Video Generated</span>
@@ -347,6 +348,19 @@ export const StudioDashboard: React.FC = () => {
                     <div className="p-3 rounded-xl bg-slate-900 border border-gray-800 text-[11px] font-mono text-gray-300 break-all">
                       {activeJob.output_video_path}
                     </div>
+
+                    <AIUploadHelper
+                      suggestions={{
+                        titles: [
+                          `🔥 ${activeJob.video_name.replace(/_/g, ' ')} — Must Watch!`,
+                          `What Happens In ${activeJob.video_name.replace(/_/g, ' ')}?`,
+                          `The Ultimate Guide to ${activeJob.video_name.replace(/_/g, ' ')} 🚀`
+                        ],
+                        description: `Enjoy this video clip from ${activeJob.video_name}!\n\n📌 Subscribe for more high-quality clips & shorts updates.\nLIKE, SHARE & COMMENT below your favorite moments!`,
+                        hashtags: ['#Shorts', '#Viral', '#Trending', '#YouTube', '#Reels', '#TikTok'],
+                        chapters: ['00:00 - Introduction & Key Hook', '00:30 - Main Highlights', '01:30 - Conclusion']
+                      }}
+                    />
                   </div>
                 )}
               </div>

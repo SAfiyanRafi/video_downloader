@@ -1,0 +1,26 @@
+{
+  "shorts": {
+    "id": "shorts",
+    "display_name": "📱 YouTube Shorts / TikTok / Reels",
+    "description": "Optimized for vertical short videos. Auto-disables intro/outro, enables 9:16 vertical scaling, AI subtitles, and thumbnail extraction.",
+    "aspect_ratio": "9:16",
+    "padding_mode": "blurred",
+    "allow_intro_outro": false,
+    "enable_subtitles": true,
+    "subtitle_preset": "tiktok",
+    "enable_thumbnails": true,
+    "export_preset": "high_quality"
+  },
+  "longform": {
+    "id": "longform",
+    "display_name": "📺 YouTube Long-Form Widescreen",
+    "description": "Optimized for 16:9 widescreen YouTube videos. Enables channel intro & outro branding, logo watermarking, and thumbnail generation.",
+    "aspect_ratio": "16:9",
+    "padding_mode": "black_bars",
+    "allow_intro_outro": true,
+    "enable_subtitles": false,
+    "subtitle_preset": "minimal",
+    "enable_thumbnails": true,
+    "export_preset": "original_quality"
+  }
+}
