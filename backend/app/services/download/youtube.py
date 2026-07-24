@@ -25,12 +25,12 @@ class YouTubeDownloader(BaseDownloader):
         output_dir.mkdir(parents=True, exist_ok=True)
         out_template = str(output_dir / "original_video.%(ext)s")
 
-        # Map quality option to yt-dlp format selector
-        format_selector = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+        # Flexible format selector with broad compatibility
+        format_selector = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/bestvideo+bestaudio/best"
         if quality == QualityOption.P1080:
-            format_selector = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best"
+            format_selector = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
         elif quality == QualityOption.P720:
-            format_selector = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
+            format_selector = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
         elif quality == QualityOption.AUDIO_ONLY:
             format_selector = "bestaudio/best"
 
@@ -51,6 +51,15 @@ class YouTubeDownloader(BaseDownloader):
             "quiet": True,
             "no_warnings": True,
             "no_color": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["mweb", "android", "web"],
+                }
+            },
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9"
+            },
             "progress_hooks": [_yt_dlp_progress_hook],
             "ffmpeg_location": ffmpeg_location,
             "overwrites": True
