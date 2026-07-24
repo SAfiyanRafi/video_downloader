@@ -44,6 +44,9 @@ export async function cancelSplitJob(jobId: string): Promise<JobResponse> {
     const response = await fetch(`${API_BASE}/jobs/${jobId}`, {
       method: 'DELETE',
     });
+    if (response.status === 404) {
+      return { job_id: jobId, status: 'failed', progress: 0, message: 'Job cleared', created_at: '', updated_at: '' };
+    }
     if (!response.ok) {
       throw new Error(`Failed to cancel job ${jobId}`);
     }
