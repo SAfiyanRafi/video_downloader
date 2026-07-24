@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
-import type { QualityOption } from '../types/job';
+import React, { useState, useEffect } from 'react';
+import { Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle, Tv } from 'lucide-react';
+import type { QualityOption, ChannelProfile } from '../types/job';
+import { fetchChannels } from '../services/api';
 
 interface JobFormProps {
-  onSubmit: (url: string, parts: number, quality: QualityOption) => void;
+  onSubmit: (url: string, parts: number, quality: QualityOption, channel?: string) => void;
   isLoading: boolean;
   error?: string | null;
 }
@@ -12,7 +13,15 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const [url, setUrl] = useState('');
   const [parts, setParts] = useState(4);
   const [quality, setQuality] = useState<QualityOption>('best');
+  const [channel, setChannel] = useState<string>('');
+  const [channels, setChannels] = useState<ChannelProfile[]>([]);
   const [urlTouched, setUrlTouched] = useState(false);
+
+  useEffect(() => {
+    fetchChannels().then((data) => {
+      setChannels(data);
+    });
+  }, []);
 
   const isValidYoutubeUrl = (u: string) => {
     return /^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/.+/i.test(u.trim());
@@ -24,7 +33,7 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
     e.preventDefault();
     setUrlTouched(true);
     if (!isUrlValid) return;
-    onSubmit(url.trim(), parts, quality);
+    onSubmit(url.trim(), parts, quality, channel || undefined);
   };
 
   const presetParts = [2, 4, 6, 8, 10, 12, 16, 20];
@@ -195,6 +204,36 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Channel Branding Profile Selector */}
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between">
+            <label htmlFor="channel-select" className="text-xs sm:text-sm font-semibold text-gray-200 flex items-center space-x-2">
+              <Tv className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span>Channel Profile Branding</span>
+            </label>
+            <span className="text-[11px] text-gray-400 font-mono">Auto Intro & Outro</span>
+          </div>
+
+          <div className="relative">
+            <select
+              id="channel-select"
+              value={channel}
+              onChange={(e) => setChannel(e.target.value)}
+              className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-slate-900 border border-gray-800 focus:border-rose-500 focus:ring-rose-500 text-white text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 transition-all cursor-pointer"
+            >
+              <option value="">None (Standard Split without Intros/Outros)</option>
+              {channels.map((chan) => (
+                <option key={chan.id} value={chan.id}>
+                  ▼ {chan.display_name} (Auto Intro & Outro Branding)
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            Selecting a channel automatically prepends its intro video and appends its outro video to every split segment clip.
+          </p>
         </div>
 
         {/* Touch-Friendly Full-Width Action Submit Button */}

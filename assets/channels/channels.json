@@ -1,0 +1,28 @@
+{
+  "rhymes4ever": {
+    "display_name": "Rhymes4ever",
+    "intro": "assets/channels/rhymes4ever/intro.mp4",
+    "outro": "assets/channels/rhymes4ever/outro.mp4",
+    "filename_prefix": "Rhymes4ever",
+    "watermark": null,
+    "logo": null,
+    "thumbnail": null,
+    "resolution": "1080p",
+    "format": "mp4",
+    "normalize_audio": true,
+    "default_quality": "best"
+  },
+  "cut_clips": {
+    "display_name": "Cut Clips",
+    "intro": "assets/channels/cut_clips/intro.mp4",
+    "outro": "assets/channels/cut_clips/outro.mp4",
+    "filename_prefix": "CutClips",
+    "watermark": null,
+    "logo": null,
+    "thumbnail": null,
+    "resolution": "1080p",
+    "format": "mp4",
+    "normalize_audio": true,
+    "default_quality": "best"
+  }
+}

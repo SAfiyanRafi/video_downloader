@@ -12,8 +12,8 @@ router = APIRouter()
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 async def create_job(request: JobCreateRequest):
     """
-    Creates a new YouTube video split job.
-    Accepts YouTube URL, desired number of parts, and quality.
+    Submits a new YouTube video splitting job.
+    Accepts YouTube URL, desired split parts (2 to 50), quality option, and optional channel profile ID.
     """
     clean_url = validate_youtube_url(request.url)
     
@@ -23,12 +23,23 @@ async def create_job(request: JobCreateRequest):
             detail=f"Parts must be between {settings.MIN_SPLIT_PARTS} and {settings.MAX_SPLIT_PARTS}"
         )
 
-    job_response = job_manager.create_job(
-        url=clean_url,
-        parts=request.parts,
-        quality=request.quality
-    )
-    return job_response
+    try:
+        return job_manager.create_job(
+            url=clean_url,
+            parts=request.parts,
+            quality=request.quality,
+            channel=request.channel
+        )
+    except (KeyError, FileNotFoundError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create job: {str(e)}"
+        )
 
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job_status(job_id: str):

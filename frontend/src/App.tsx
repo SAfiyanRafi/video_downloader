@@ -64,11 +64,11 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [currentJob]);
 
-  const handleCreateJob = async (url: string, parts: number, quality: QualityOption) => {
+  const handleCreateJob = async (url: string, parts: number, quality: QualityOption, channel?: string) => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const job = await createSplitJob(url, parts, quality);
+      const job = await createSplitJob(url, parts, quality, channel);
       setCurrentJob(job);
       setDownloads(null);
       localStorage.setItem(ACTIVE_JOB_KEY, job.job_id);

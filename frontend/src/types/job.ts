@@ -5,9 +5,20 @@ export type JobStatus =
   | 'downloading'
   | 'analyzing'
   | 'splitting'
+  | 'branding'
   | 'zipping'
   | 'completed'
   | 'failed';
+
+export interface ChannelProfile {
+  id: string;
+  display_name: string;
+  intro?: string;
+  outro?: string;
+  filename_prefix?: string;
+  resolution?: string;
+  format?: string;
+}
 
 export interface VideoMetadata {
   duration: number;

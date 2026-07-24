@@ -12,6 +12,8 @@ from app.services.download.youtube import YouTubeDownloader
 from app.services.metadata.ffprobe_service import FFprobeService
 from app.services.split.equal_split_service import EqualSplitService
 from app.services.processing.ffmpeg_service import FFmpegService
+from app.services.branding.channel_service import ChannelService
+from app.services.branding.branding_service import BrandingService
 from app.services.storage.local_storage import LocalStorageProvider
 from app.services.zip.zip_service import ZipService
 from app.core.config import settings
@@ -19,11 +21,12 @@ from app.core.config import settings
 logger = logging.getLogger("yt_splitter")
 
 class JobState:
-    def __init__(self, job_id: str, url: str, parts: int, quality: QualityOption):
+    def __init__(self, job_id: str, url: str, parts: int, quality: QualityOption, channel: Optional[str] = None):
         self.job_id = job_id
         self.url = url
         self.parts = parts
         self.quality = quality
+        self.channel = channel
         self.status = JobStatus.PENDING
         self.progress = 0.0
         self.message = "Job queued"
@@ -51,11 +54,17 @@ class JobManager:
         self.ffprobe = FFprobeService()
         self.splitter = EqualSplitService()
         self.ffmpeg = FFmpegService()
+        self.channel_service = ChannelService()
+        self.branding_service = BrandingService()
         self.zipper = ZipService()
 
-    def create_job(self, url: str, parts: int, quality: QualityOption) -> JobResponse:
+    def create_job(self, url: str, parts: int, quality: QualityOption, channel: Optional[str] = None) -> JobResponse:
+        # Validate channel profile if specified
+        if channel:
+            self.channel_service.validate_channel_assets(channel)
+
         job_id = str(uuid.uuid4())[:8]
-        state = JobState(job_id, url, parts, quality)
+        state = JobState(job_id, url, parts, quality, channel)
         self.jobs[job_id] = state
 
         # Schedule background processing task and store task reference
@@ -188,24 +197,77 @@ class JobManager:
                 progress_callback=_split_progress
             )
 
-            # Update segment filenames relative to job directory
-            for seg in state.segments:
-                seg.filename = f"clips/{seg.filename}"
+            final_clip_paths = generated_clip_paths
 
-            # 4. ZIPPING STAGE (85% -> 99%)
+            # 4. BRANDING STAGE (70% -> 85%) (If channel selected)
+            if state.channel:
+                state.status = JobStatus.BRANDING
+                state.message = f"Applying Intro & Outro branding for profile '{state.channel}'..."
+                state.progress = 70.0
+                state.updated_at = datetime.now(timezone.utc)
+
+                profile = self.channel_service.get_channel(state.channel)
+                root_dir = self.channel_service.root_dir
+
+                intro_path = (root_dir / profile.intro) if profile.intro else None
+                outro_path = (root_dir / profile.outro) if profile.outro else None
+                prefix = profile.filename_prefix or profile.id
+
+                branded_dir = job_dir / "branded"
+                branded_clip_paths = []
+                total_clips = len(generated_clip_paths)
+
+                for idx, raw_clip in enumerate(generated_clip_paths):
+                    part_num = idx + 1
+                    branded_filename = f"{prefix}_Part_{part_num:02d}.mp4"
+                    branded_output = branded_dir / branded_filename
+
+                    await self.branding_service.add_intro_outro(
+                        clip_path=raw_clip,
+                        output_path=branded_output,
+                        intro_path=intro_path,
+                        outro_path=outro_path
+                    )
+                    branded_clip_paths.append(branded_output)
+
+                    # Update SegmentInfo records
+                    if idx < len(state.segments):
+                        state.segments[idx].filename = f"branded/{branded_filename}"
+
+                    # Update progress
+                    frac = part_num / total_clips
+                    state.progress = 70.0 + (frac * 15.0)
+                    state.message = f"Applying branding to clip {part_num}/{total_clips}..."
+                    state.updated_at = datetime.now(timezone.utc)
+
+                # Cleanup intermediate raw split clips to save disk space
+                try:
+                    for raw_c in generated_clip_paths:
+                        if raw_c.exists():
+                            raw_c.unlink()
+                except Exception as clean_err:
+                    logger.warning(f"Failed to cleanup intermediate split clips: {clean_err}")
+
+                final_clip_paths = branded_clip_paths
+            else:
+                # Update segment filenames relative to job directory
+                for seg in state.segments:
+                    seg.filename = f"clips/{seg.filename}"
+
+            # 5. ZIPPING STAGE (85% -> 99%)
             state.status = JobStatus.ZIPPING
             state.message = "Creating ZIP archive of video parts..."
             state.progress = 90.0
             state.updated_at = datetime.now(timezone.utc)
 
             zip_output_path = job_dir / "video_parts.zip"
-            await self.zipper.create_zip_archive(generated_clip_paths, zip_output_path)
+            await self.zipper.create_zip_archive(final_clip_paths, zip_output_path)
             state.zip_filename = "video_parts.zip"
 
-            # 5. COMPLETED
+            # 6. COMPLETED
             state.status = JobStatus.COMPLETED
             state.progress = 100.0
-            state.message = "Video splitting completed successfully"
+            state.message = "Video splitting and branding completed successfully"
             state.updated_at = datetime.now(timezone.utc)
             logger.info(f"Job {job_id} successfully completed.")
 

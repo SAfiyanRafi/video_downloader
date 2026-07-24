@@ -15,6 +15,7 @@ class JobStatus(str, Enum):
     DOWNLOADING = "downloading"
     ANALYZING = "analyzing"
     SPLITTING = "splitting"
+    BRANDING = "branding"
     ZIPPING = "zipping"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -23,6 +24,7 @@ class JobCreateRequest(BaseModel):
     url: str = Field(..., description="YouTube Video URL")
     parts: int = Field(default=4, ge=2, le=50, description="Number of equal parts to split into")
     quality: QualityOption = Field(default=QualityOption.BEST, description="Desired download resolution quality")
+    channel: Optional[str] = Field(default=None, description="Optional channel profile ID for intro/outro branding")
 
 class JobResponse(BaseModel):
     job_id: str

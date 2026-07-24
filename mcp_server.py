@@ -65,6 +65,10 @@ def handle_tools_list(request_id):
                                 "description": "Desired resolution quality: best, 1080p, 720p, or audio_only",
                                 "enum": ["best", "1080p", "720p", "audio_only"],
                                 "default": "best"
+                            },
+                            "channel": {
+                                "type": "string",
+                                "description": "Optional channel profile ID for intro/outro branding (e.g. rhymes4ever, cut_clips)"
                             }
                         },
                         "required": ["url"]
@@ -91,10 +95,15 @@ def handle_tools_call(request_id, params):
     url = arguments.get("url")
     parts = arguments.get("parts", 4)
     quality = arguments.get("quality", "best")
+    channel = arguments.get("channel")
 
     try:
         # 1. Create Job
-        create_res = http_post(f"{BACKEND_API_BASE}/jobs", {"url": url, "parts": parts, "quality": quality})
+        payload = {"url": url, "parts": parts, "quality": quality}
+        if channel:
+            payload["channel"] = channel
+
+        create_res = http_post(f"{BACKEND_API_BASE}/jobs", payload)
         job_id = create_res["job_id"]
 
         # 2. Poll until completed or failed
