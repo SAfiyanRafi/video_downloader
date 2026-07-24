@@ -286,9 +286,9 @@ class JobManager:
             elif "is not a valid URL" in clean_err:
                 friendly_err = "Invalid YouTube URL format."
             else:
-                friendly_err = clean_err or "An error occurred during video processing."
+                friendly_err = clean_err if clean_err else f"{type(e).__name__}: {str(e)}"
 
-            logger.error(f"Job {job_id} failed: {clean_err}", exc_info=True)
+            logger.error(f"Job {job_id} failed: {clean_err or repr(e)}", exc_info=True)
             state.status = JobStatus.FAILED
             state.error = friendly_err
             state.message = f"Failed: {friendly_err}"
