@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { Scissors, Cpu, ShieldCheck, Menu, X, Code2, BookOpen } from 'lucide-react';
+import { Scissors, Cpu, ShieldCheck, Menu, X, Code2, BookOpen, History } from 'lucide-react';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onOpenHistory?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onOpenHistory }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -33,6 +37,15 @@ export const Header: React.FC = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-4 lg:space-x-6">
+          {onOpenHistory && (
+            <button
+              onClick={onOpenHistory}
+              className="flex items-center space-x-1.5 text-xs font-semibold text-gray-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-900 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
+            >
+              <History className="w-4 h-4 text-rose-400" />
+              <span>History</span>
+            </button>
+          )}
           <a
             href="http://localhost:8000/docs"
             target="_blank"

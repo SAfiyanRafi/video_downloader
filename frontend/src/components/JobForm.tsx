@@ -1,10 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle, Tv, Crop, Smartphone, Monitor, Square, Maximize2 } from 'lucide-react';
-import type { QualityOption, AspectRatioOption, ChannelProfile } from '../types/job';
+import {
+  Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle,
+  Tv, Crop, Smartphone, Monitor, Square, Maximize2, Sliders, FileText, Image
+} from 'lucide-react';
+import type {
+  QualityOption, AspectRatioOption, ExportPreset, PaddingMode, NamingTemplate, ChannelProfile
+} from '../types/job';
 import { fetchChannels } from '../services/api';
 
 interface JobFormProps {
-  onSubmit: (url: string, parts: number, quality: QualityOption, aspectRatio: AspectRatioOption, channel?: string) => void;
+  onSubmit: (
+    url: string,
+    parts: number,
+    quality: QualityOption,
+    aspectRatio: AspectRatioOption,
+    exportPreset: ExportPreset,
+    paddingMode: PaddingMode,
+    namingTemplate: NamingTemplate,
+    cropFill: boolean,
+    channel?: string
+  ) => void;
   isLoading: boolean;
   error?: string | null;
 }
@@ -14,6 +29,10 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const [parts, setParts] = useState(4);
   const [quality, setQuality] = useState<QualityOption>('best');
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('original');
+  const [exportPreset, setExportPreset] = useState<ExportPreset>('high_quality');
+  const [paddingMode, setPaddingMode] = useState<PaddingMode>('black_bars');
+  const [namingTemplate, setNamingTemplate] = useState<NamingTemplate>('{channel}_Part_{number}');
+  const [cropFill, setCropFill] = useState(false);
   const [channel, setChannel] = useState<string>('');
   const [channels, setChannels] = useState<ChannelProfile[]>([]);
   const [urlTouched, setUrlTouched] = useState(false);
@@ -34,7 +53,10 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
     e.preventDefault();
     setUrlTouched(true);
     if (!isUrlValid) return;
-    onSubmit(url.trim(), parts, quality, aspectRatio, channel || undefined);
+    onSubmit(
+      url.trim(), parts, quality, aspectRatio,
+      exportPreset, paddingMode, namingTemplate, cropFill, channel || undefined
+    );
   };
 
   const presetParts = [2, 4, 6, 8, 10, 12, 16, 20];
@@ -176,17 +198,19 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
           </div>
         </div>
 
-        {/* Quality Option Selector */}
+        {/* Quality Resolution Selector */}
         <div className="space-y-3">
           <label className="block text-xs sm:text-sm font-semibold text-gray-200 flex items-center space-x-2">
             <Settings2 className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Video Resolution Quality</span>
+            <span>Download Resolution Quality</span>
           </label>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
             {[
-              { id: 'best', label: 'Best Quality', desc: 'Original Resolution' },
-              { id: '1080p', label: '1080p Full HD', desc: '1920x1080' },
+              { id: 'best', label: 'Best Source', desc: 'Max Available' },
+              { id: '2160p', label: '2160p 4K', desc: '3840x2160' },
+              { id: '1440p', label: '1440p 2K', desc: '2560x1440' },
+              { id: '1080p', label: '1080p FHD', desc: '1920x1080' },
               { id: '720p', label: '720p HD', desc: '1280x720' },
               { id: 'audio_only', label: 'Audio Only', desc: 'MP3/M4A Extract' },
             ].map((q) => (
@@ -194,21 +218,21 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
                 key={q.id}
                 type="button"
                 onClick={() => setQuality(q.id as QualityOption)}
-                className={`p-4 rounded-xl border text-left transition-all min-h-[64px] flex flex-col justify-center ${
+                className={`p-3 rounded-xl border text-left transition-all min-h-[60px] flex flex-col justify-center ${
                   quality === q.id
-                    ? 'bg-rose-500/15 border-rose-500 text-white ring-1 ring-rose-500/50 shadow-lg shadow-rose-500/10'
+                    ? 'bg-amber-500/15 border-amber-500 text-white ring-1 ring-amber-500/50 shadow-lg shadow-amber-500/10'
                     : 'bg-slate-900/70 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200'
-                } focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none`}
+                } focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none`}
               >
-                <div className="text-xs sm:text-sm font-bold text-gray-200">{q.label}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5">{q.desc}</div>
+                <div className="text-xs font-bold text-gray-200">{q.label}</div>
+                <div className="text-[10px] text-gray-500 mt-0.5">{q.desc}</div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Target Video Dimension / Aspect Ratio Module */}
-        <div className="space-y-3 pt-1">
+        {/* Target Video Dimension / Aspect Ratio & Padding Mode */}
+        <div className="space-y-4 pt-1">
           <div className="flex items-center justify-between">
             <label className="text-xs sm:text-sm font-semibold text-gray-200 flex items-center space-x-2">
               <Crop className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -251,6 +275,90 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
                 </button>
               );
             })}
+          </div>
+
+          {/* Padding Mode Options & Crop Fill Switch */}
+          {aspectRatio !== 'original' && (
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-gray-800/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-300 flex items-center space-x-1.5">
+                  <Image className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Padding Mode (Fit Whole Frame)</span>
+                </label>
+
+                {/* Optional Crop Fill Toggle */}
+                <label className="flex items-center space-x-2 cursor-pointer text-xs text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={cropFill}
+                    onChange={(e) => setCropFill(e.target.checked)}
+                    className="w-4 h-4 rounded accent-emerald-500 bg-slate-950 border-gray-700"
+                  />
+                  <span>Crop Fill (Cut video edges)</span>
+                </label>
+              </div>
+
+              {!cropFill && (
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'black_bars', label: '⬛ Black Bars (Letterbox)', desc: 'Clean black padding around video' },
+                    { id: 'blurred', label: '🌫️ Blurred Background', desc: 'Blurred source video background fill' },
+                  ].map((pm) => (
+                    <button
+                      key={pm.id}
+                      type="button"
+                      onClick={() => setPaddingMode(pm.id as PaddingMode)}
+                      className={`p-3 rounded-xl border text-left transition-all text-xs ${
+                        paddingMode === pm.id
+                          ? 'bg-emerald-500/15 border-emerald-500 text-white font-bold ring-1 ring-emerald-500/40'
+                          : 'bg-slate-950 border-gray-800 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <div>{pm.label}</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">{pm.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Export Quality Preset & Naming Template */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          {/* Export Preset */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-300 flex items-center space-x-1.5">
+              <Sliders className="w-3.5 h-3.5 text-rose-400" />
+              <span>Export Quality Preset</span>
+            </label>
+            <select
+              value={exportPreset}
+              onChange={(e) => setExportPreset(e.target.value as ExportPreset)}
+              className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-slate-900 border border-gray-800 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500"
+            >
+              <option value="original_quality">💎 Original Quality (CRF 16 - Visually Lossless)</option>
+              <option value="high_quality">✨ High Quality (CRF 18 - Broadcast HD)</option>
+              <option value="balanced">⚡ Balanced (CRF 22 - Fast & Crisp)</option>
+              <option value="small_file">📦 Small File (CRF 28 - High Compression)</option>
+            </select>
+          </div>
+
+          {/* Naming Template */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-300 flex items-center space-x-1.5">
+              <FileText className="w-3.5 h-3.5 text-pink-400" />
+              <span>Clip Naming Template</span>
+            </label>
+            <select
+              value={namingTemplate}
+              onChange={(e) => setNamingTemplate(e.target.value as NamingTemplate)}
+              className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-slate-900 border border-gray-800 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono"
+            >
+              <option value="{channel}_Part_{number}">Rhymes4ever_Part_01.mp4</option>
+              <option value="{original}_Clip_{number}">Clip_01.mp4</option>
+              <option value="{date}_{channel}_Part_{number}">2026-07-24_Rhymes4ever_Part_01.mp4</option>
+            </select>
           </div>
         </div>
 

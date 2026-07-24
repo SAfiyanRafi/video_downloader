@@ -1,6 +1,12 @@
-export type QualityOption = 'best' | '1080p' | '720p' | 'audio_only';
+export type QualityOption = 'best' | '2160p' | '1440p' | '1080p' | '720p' | '480p' | 'audio_only';
 
 export type AspectRatioOption = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
+
+export type ExportPreset = 'original_quality' | 'high_quality' | 'balanced' | 'small_file';
+
+export type PaddingMode = 'black_bars' | 'blurred' | 'solid_color';
+
+export type NamingTemplate = '{channel}_Part_{number}' | '{original}_Clip_{number}' | '{date}_{channel}_Part_{number}';
 
 export type JobStatus =
   | 'pending'
@@ -52,6 +58,8 @@ export interface JobResponse {
   updated_at: string;
   error?: string;
   metadata?: VideoMetadata;
+  parts?: number;
+  url?: string;
 }
 
 export interface JobDownloadsResponse {

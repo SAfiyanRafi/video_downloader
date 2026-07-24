@@ -29,6 +29,10 @@ async def create_job(request: JobCreateRequest):
             parts=request.parts,
             quality=request.quality,
             aspect_ratio=request.aspect_ratio,
+            export_preset=request.export_preset,
+            padding_mode=request.padding_mode,
+            naming_template=request.naming_template,
+            crop_fill=request.crop_fill,
             channel=request.channel
         )
     except (KeyError, FileNotFoundError) as e:

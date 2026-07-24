@@ -8,7 +8,7 @@ from app.services.metadata.ffprobe_service import FFprobeService
 
 logger = logging.getLogger("yt_splitter")
 
-from app.models.job import AspectRatioOption
+from app.models.job import AspectRatioOption, ExportPreset, PaddingMode
 
 def _exec_subprocess(cmd: List[str]) -> tuple[int, str, str]:
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -16,28 +16,54 @@ def _exec_subprocess(cmd: List[str]) -> tuple[int, str, str]:
     stderr_str = proc.stderr.decode('utf-8', errors='ignore')
     return proc.returncode, stdout_str, stderr_str
 
-def get_video_filter(aspect_ratio: AspectRatioOption) -> str:
+def get_video_filter(
+    aspect_ratio: AspectRatioOption,
+    padding_mode: PaddingMode = PaddingMode.BLACK_BARS,
+    crop_fill: bool = False
+) -> str:
     val = aspect_ratio.value if isinstance(aspect_ratio, AspectRatioOption) else str(aspect_ratio)
-    if val == "9:16":
-        # 1080x1920 Vertical Short (Whole Frame Fitted cleanly without cropping)
-        return "scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
-    elif val == "16:9":
-        # 1920x1080 Landscape Widescreen (Whole Frame Fitted)
-        return "scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
-    elif val == "1:1":
-        # 1080x1080 Square (Whole Frame Fitted)
-        return "scale=1080:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
-    elif val == "4:5":
-        # 1080x1350 Mobile Portrait (Whole Frame Fitted)
-        return "scale=1080:1350:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1350:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
+    p_mode = padding_mode.value if isinstance(padding_mode, PaddingMode) else str(padding_mode)
+
+    dim_map = {
+        "9:16": (1080, 1920),
+        "16:9": (1920, 1080),
+        "1:1": (1080, 1080),
+        "4:5": (1080, 1350),
+    }
+
+    tw, th = dim_map.get(val, (1280, 720))
+
+    if crop_fill:
+        return f"scale={tw}:{th}:force_original_aspect_ratio=increase:flags=lanczos,crop={tw}:{th},setsar=1,fps=30"
+
+    if p_mode == "blurred" and val != "original":
+        # Split filter: Blurred background + centered sharp foreground
+        return (
+            f"split[vfg][vbg];"
+            f"[vbg]scale={tw}:{th}:force_original_aspect_ratio=increase:flags=lanczos,crop={tw}:{th},boxblur=20:10[bg];"
+            f"[vfg]scale={tw}:{th}:force_original_aspect_ratio=decrease:flags=lanczos[fg];"
+            f"[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1,fps=30"
+        )
     else:
-        # Original Native Dimensions (Whole Frame Unchanged with High-Fidelity Lanczos Scaling)
-        return "scale=1280:720:force_original_aspect_ratio=decrease:flags=lanczos,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
+        # Clean letterbox / pillarbox padding (black bars)
+        return f"scale={tw}:{th}:force_original_aspect_ratio=decrease:flags=lanczos,pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30"
+
+def get_export_params(preset: ExportPreset) -> tuple[str, str, str]:
+    val = preset.value if isinstance(preset, ExportPreset) else str(preset)
+    if val == "original_quality":
+        return ("veryfast", "16", "320k")
+    elif val == "high_quality":
+        return ("veryfast", "18", "256k")
+    elif val == "balanced":
+        return ("fast", "22", "192k")
+    else: # small_file
+        return ("ultrafast", "28", "128k")
 
 class BrandingService:
     """
     Independent service responsible for prepending an Intro, appending an Outro,
-    and fitting video frames into target aspect ratio dimensions (9:16, 16:9, 1:1, 4:5).
+    and fitting video frames into target aspect ratio dimensions (9:16, 16:9, 1:1, 4:5)
+    with padding modes (blurred background, black bars) and export quality presets.
     """
     def __init__(self):
         self.ffmpeg_bin = get_ffmpeg_executable()
@@ -56,17 +82,20 @@ class BrandingService:
         output_path: Path,
         intro_path: Optional[Path] = None,
         outro_path: Optional[Path] = None,
-        aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL
+        aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL,
+        export_preset: ExportPreset = ExportPreset.HIGH,
+        padding_mode: PaddingMode = PaddingMode.BLACK_BARS,
+        crop_fill: bool = False
     ) -> Path:
         """
         Concatenates [Intro (if present)] + [Clip] + [Outro (if present)] into output_path
-        while fitting full video frames into target aspect ratio dimensions cleanly without cropping.
+        while applying requested padding mode and export quality preset.
         """
         if not clip_path.exists():
             raise FileNotFoundError(f"Input clip file not found: {clip_path}")
 
-        # If no intro, no outro, and aspect_ratio is original, copy clip to output_path
-        if not intro_path and not outro_path and aspect_ratio == AspectRatioOption.ORIGINAL:
+        # If no intro, no outro, aspect_ratio is original, and default preset, copy clip directly
+        if not intro_path and not outro_path and aspect_ratio == AspectRatioOption.ORIGINAL and export_preset == ExportPreset.ORIGINAL and not crop_fill:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(clip_path.read_bytes())
             return output_path
@@ -83,7 +112,8 @@ class BrandingService:
         count = len(inputs)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        v_filter = get_video_filter(aspect_ratio)
+        v_filter = get_video_filter(aspect_ratio, padding_mode, crop_fill)
+        preset_name, crf_val, bit_rate = get_export_params(export_preset)
 
         # Primary approach: FFmpeg complex filter concatenation
         cmd = [self.ffmpeg_bin, "-y"]
@@ -120,14 +150,14 @@ class BrandingService:
             "-map", "[outv]",
             "-map", "[outa]",
             "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-crf", "18",
+            "-preset", preset_name,
+            "-crf", crf_val,
             "-c:a", "aac",
-            "-b:a", "320k",
+            "-b:a", bit_rate,
             str(output_path)
         ])
 
-        logger.info(f"Applying branding/aspect_ratio ({aspect_ratio}) to {clip_path.name} -> {output_path.name}")
+        logger.info(f"Applying branding/aspect ({aspect_ratio}, {padding_mode}) to {clip_path.name} -> {output_path.name}")
         returncode, stdout, stderr = await asyncio.to_thread(_exec_subprocess, cmd)
 
         if returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
@@ -136,13 +166,16 @@ class BrandingService:
         logger.warning(f"Complex filter concatenation failed for {clip_path.name}: {stderr[:300]}. Attempting fallback re-encode method...")
 
         # Fallback method: Pre-normalize inputs into temporary files then concat
-        return await self._fallback_concat(inputs, output_path, aspect_ratio)
+        return await self._fallback_concat(inputs, output_path, aspect_ratio, export_preset, padding_mode, crop_fill)
 
     async def _fallback_concat(
         self,
         inputs: List[Path],
         output_path: Path,
-        aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL
+        aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL,
+        export_preset: ExportPreset = ExportPreset.HIGH,
+        padding_mode: PaddingMode = PaddingMode.BLACK_BARS,
+        crop_fill: bool = False
     ) -> Path:
         """
         Fallback concatenation method for unusual video formats.
@@ -151,7 +184,8 @@ class BrandingService:
         temp_dir = output_path.parent / "_temp_branding"
         temp_dir.mkdir(parents=True, exist_ok=True)
         ts_files = []
-        v_filter = get_video_filter(aspect_ratio)
+        v_filter = get_video_filter(aspect_ratio, padding_mode, crop_fill)
+        preset_name, crf_val, bit_rate = get_export_params(export_preset)
 
         try:
             for idx, inp in enumerate(inputs):
@@ -168,8 +202,8 @@ class BrandingService:
 
                 cmd.extend([
                     "-vf", v_filter,
-                    "-c:v", "libx264", "-preset", "ultrafast",
-                    "-c:a", "aac", "-ar", "44100", "-ac", "2",
+                    "-c:v", "libx264", "-preset", preset_name, "-crf", crf_val,
+                    "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", bit_rate,
                     "-f", "mpegts",
                     str(ts_file)
                 ])

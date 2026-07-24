@@ -6,7 +6,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
-from app.models.job import JobStatus, JobResponse, JobDownloadsResponse, QualityOption, AspectRatioOption
+from app.models.job import (
+    JobStatus, JobResponse, JobDownloadsResponse, QualityOption, AspectRatioOption,
+    ExportPreset, PaddingMode, NamingTemplate
+)
 from app.models.video import VideoMetadata, SegmentInfo
 from app.services.download.youtube import YouTubeDownloader
 from app.services.metadata.ffprobe_service import FFprobeService
@@ -28,6 +31,10 @@ class JobState:
         parts: int,
         quality: QualityOption,
         aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL,
+        export_preset: ExportPreset = ExportPreset.HIGH,
+        padding_mode: PaddingMode = PaddingMode.BLACK_BARS,
+        naming_template: NamingTemplate = NamingTemplate.CHANNEL_PART,
+        crop_fill: bool = False,
         channel: Optional[str] = None
     ):
         self.job_id = job_id
@@ -35,6 +42,10 @@ class JobState:
         self.parts = parts
         self.quality = quality
         self.aspect_ratio = aspect_ratio
+        self.export_preset = export_preset
+        self.padding_mode = padding_mode
+        self.naming_template = naming_template
+        self.crop_fill = crop_fill
         self.channel = channel
         self.status = JobStatus.PENDING
         self.progress = 0.0
@@ -73,6 +84,10 @@ class JobManager:
         parts: int,
         quality: QualityOption,
         aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL,
+        export_preset: ExportPreset = ExportPreset.HIGH,
+        padding_mode: PaddingMode = PaddingMode.BLACK_BARS,
+        naming_template: NamingTemplate = NamingTemplate.CHANNEL_PART,
+        crop_fill: bool = False,
         channel: Optional[str] = None
     ) -> JobResponse:
         # Validate channel profile if specified
@@ -80,7 +95,10 @@ class JobManager:
             self.channel_service.validate_channel_assets(channel)
 
         job_id = str(uuid.uuid4())[:8]
-        state = JobState(job_id, url, parts, quality, aspect_ratio, channel)
+        state = JobState(
+            job_id, url, parts, quality, aspect_ratio,
+            export_preset, padding_mode, naming_template, crop_fill, channel
+        )
         self.jobs[job_id] = state
 
         # Schedule background processing task and store task reference
@@ -122,7 +140,9 @@ class JobManager:
             created_at=state.created_at,
             updated_at=state.updated_at,
             error=state.error,
-            metadata=state.metadata
+            metadata=state.metadata,
+            url=state.url,
+            parts=state.parts
         )
 
     def get_job_downloads(self, job_id: str) -> JobDownloadsResponse:
@@ -224,7 +244,7 @@ class JobManager:
 
                 intro_path = None
                 outro_path = None
-                prefix = "Clip"
+                prefix = "Media"
 
                 if state.channel:
                     profile = self.channel_service.get_channel(state.channel)
@@ -236,10 +256,18 @@ class JobManager:
                 branded_dir = job_dir / "branded"
                 branded_clip_paths = []
                 total_clips = len(generated_clip_paths)
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
                 for idx, raw_clip in enumerate(generated_clip_paths):
                     part_num = idx + 1
-                    branded_filename = f"{prefix}_Part_{part_num:02d}.mp4"
+                    
+                    if state.naming_template == NamingTemplate.ORIGINAL_CLIP:
+                        branded_filename = f"Clip_{part_num:02d}.mp4"
+                    elif state.naming_template == NamingTemplate.DATE_CHANNEL_PART:
+                        branded_filename = f"{today_str}_{prefix}_Part_{part_num:02d}.mp4"
+                    else:
+                        branded_filename = f"{prefix}_Part_{part_num:02d}.mp4"
+
                     branded_output = branded_dir / branded_filename
 
                     await self.branding_service.add_intro_outro(
@@ -247,7 +275,10 @@ class JobManager:
                         output_path=branded_output,
                         intro_path=intro_path,
                         outro_path=outro_path,
-                        aspect_ratio=state.aspect_ratio
+                        aspect_ratio=state.aspect_ratio,
+                        export_preset=state.export_preset,
+                        padding_mode=state.padding_mode,
+                        crop_fill=state.crop_fill
                     )
                     branded_clip_paths.append(branded_output)
 

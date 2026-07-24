@@ -26,12 +26,16 @@ class YouTubeDownloader(BaseDownloader):
         out_template = str(output_dir / "original_video.%(ext)s")
 
         # Format selector prioritizing maximum resolution, bitrate, and best audio/video tracks
-        if quality == QualityOption.BEST:
-            format_selector = "bestvideo+bestaudio/best"
+        if quality == QualityOption.P2160:
+            format_selector = "bestvideo[height<=2160]+bestaudio/best[height<=2160]/bestvideo+bestaudio/best"
+        elif quality == QualityOption.P1440:
+            format_selector = "bestvideo[height<=1440]+bestaudio/best[height<=1440]/bestvideo+bestaudio/best"
         elif quality == QualityOption.P1080:
             format_selector = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/bestvideo+bestaudio/best"
         elif quality == QualityOption.P720:
             format_selector = "bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best"
+        elif quality == QualityOption.P480:
+            format_selector = "bestvideo[height<=480]+bestaudio/best[height<=480]/bestvideo+bestaudio/best"
         elif quality == QualityOption.AUDIO_ONLY:
             format_selector = "bestaudio/best"
         else:

@@ -1,4 +1,7 @@
-import type { JobResponse, JobDownloadsResponse, QualityOption, AspectRatioOption } from '../types/job';
+import type {
+  QualityOption, AspectRatioOption, ExportPreset, PaddingMode, NamingTemplate,
+  JobResponse, JobDownloadsResponse
+} from '../types/job';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000') + '/api/v1';
 
@@ -7,10 +10,23 @@ export async function createSplitJob(
   parts: number = 4,
   quality: QualityOption = 'best',
   aspectRatio: AspectRatioOption = 'original',
+  exportPreset: ExportPreset = 'high_quality',
+  paddingMode: PaddingMode = 'black_bars',
+  namingTemplate: NamingTemplate = '{channel}_Part_{number}',
+  cropFill: boolean = false,
   channel?: string
 ): Promise<JobResponse> {
   try {
-    const payload: any = { url, parts, quality, aspect_ratio: aspectRatio };
+    const payload: any = {
+      url,
+      parts,
+      quality,
+      aspect_ratio: aspectRatio,
+      export_preset: exportPreset,
+      padding_mode: paddingMode,
+      naming_template: namingTemplate,
+      crop_fill: cropFill
+    };
     if (channel) {
       payload.channel = channel;
     }
