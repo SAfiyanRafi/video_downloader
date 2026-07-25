@@ -18,6 +18,7 @@ from app.services.processing.ffmpeg_service import FFmpegService
 from app.services.branding.channel_service import ChannelService
 from app.services.branding.branding_service import BrandingService
 from app.services.storage.local_storage import LocalStorageProvider
+from app.services.sources.source_manager import source_manager
 from app.services.zip.zip_service import ZipService
 from app.core.config import settings
 
@@ -187,12 +188,11 @@ class JobManager:
                 state.progress = (pct / 100.0) * 40.0
                 state.updated_at = datetime.now(timezone.utc)
 
-            downloaded_video = await self.downloader.download(
+            import_result = await source_manager.import_source(
                 source=state.url,
-                output_dir=job_dir,
-                quality=state.quality,
-                progress_callback=_download_progress
+                target_dir=job_dir
             )
+            downloaded_video = Path(import_result.local_path)
             state.progress = 40.0
 
             # 2. ANALYZING METADATA STAGE (40% -> 50%)

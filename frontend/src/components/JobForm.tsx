@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Video, Layers, Settings2, Play, Sparkles, CheckCircle2, AlertCircle,
+  Video, Layers, Settings2, Play, Sparkles, AlertCircle,
   Tv, Crop, Smartphone, Monitor, Square, Maximize2, Sliders, FileText, Image, Folder, Workflow
 } from 'lucide-react';
 import type {
@@ -79,11 +79,39 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
     setExportPreset(wf.export_preset as ExportPreset);
   };
 
-  const isValidYoutubeUrl = (u: string) => {
-    return /^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/.+/i.test(u.trim());
+  const isValidMediaSource = (u: string) => {
+    const s = u.trim();
+    if (!s) return false;
+    if (/^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/.+/i.test(s)) return true;
+    if (s.startsWith('http://') || s.startsWith('https://')) return true;
+    if (s.length > 3 && (s.endsWith('.mp4') || s.endsWith('.mov') || s.endsWith('.mkv') || s.endsWith('.webm'))) return true;
+    return false;
   };
 
-  const isUrlValid = isValidYoutubeUrl(url);
+  const isUrlValid = isValidMediaSource(url);
+
+  const getSourceBadge = (u: string) => {
+    const s = u.trim().toLowerCase();
+    if (!s) return null;
+    if (s.includes('youtube.com') || s.includes('youtu.be')) {
+      return { label: '📺 YouTube Video', color: 'bg-red-500/20 text-red-300' };
+    }
+    if (s.includes('.m3u8')) {
+      return { label: '📡 HLS Stream (.m3u8)', color: 'bg-purple-500/20 text-purple-300' };
+    }
+    if (s.includes('.mpd')) {
+      return { label: '📊 DASH Stream (.mpd)', color: 'bg-indigo-500/20 text-indigo-300' };
+    }
+    if (s.endsWith('.mp4') || s.endsWith('.mov') || s.endsWith('.mkv') || s.endsWith('.webm')) {
+      if (s.startsWith('http://') || s.startsWith('https://')) {
+        return { label: '🌐 Direct Video Link', color: 'bg-emerald-500/20 text-emerald-300' };
+      }
+      return { label: '📁 Local Media File', color: 'bg-amber-500/20 text-amber-300' };
+    }
+    return { label: '🎬 Media Source', color: 'bg-slate-800 text-gray-300' };
+  };
+
+  const sourceBadge = getSourceBadge(url);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,31 +156,30 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
           </div>
         )}
 
-        {/* YouTube URL Input Section */}
+        {/* Universal Media Input Section */}
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-            <label htmlFor="youtube-url-input" className="text-xs sm:text-sm font-semibold text-gray-200 flex items-center space-x-2">
+            <label htmlFor="media-source-input" className="text-xs sm:text-sm font-semibold text-gray-200 flex items-center space-x-2">
               <Video className="w-4 h-4 text-rose-500 shrink-0" />
-              <span>YouTube Video URL</span>
+              <span>Add Media Source (URL, HLS, DASH, or Local File)</span>
             </label>
-            {urlTouched && isUrlValid && (
-              <span className="text-xs text-emerald-400 flex items-center space-x-1 font-medium">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                <span>Valid YouTube Link</span>
+            {sourceBadge && (
+              <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${sourceBadge.color}`}>
+                {sourceBadge.label}
               </span>
             )}
           </div>
 
           <div className="relative">
             <input
-              id="youtube-url-input"
-              type="url"
+              id="media-source-input"
+              type="text"
               value={url}
               onChange={(e) => {
                 setUrl(e.target.value);
                 if (!urlTouched) setUrlTouched(true);
               }}
-              placeholder="https://www.youtube.com/watch?v=..."
+              placeholder="Paste YouTube URL, Direct Video Link (.mp4), HLS (.m3u8), DASH (.mpd), or Local Path"
               className={`w-full min-h-[48px] px-4 py-3 rounded-xl bg-slate-900/90 border ${
                 urlTouched && !isUrlValid && url
                   ? 'border-red-500 focus:ring-red-500'

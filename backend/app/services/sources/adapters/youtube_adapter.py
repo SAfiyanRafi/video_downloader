@@ -1,0 +1,53 @@
+import re
+import asyncio
+import logging
+from pathlib import Path
+from typing import Tuple, Optional
+from app.models.source import MediaMetadata, SourceType
+from app.services.sources.base_adapter import BaseSourceAdapter
+from app.services.download.youtube import YouTubeDownloader
+
+logger = logging.getLogger("yt_splitter")
+
+class YouTubeAdapter(BaseSourceAdapter):
+    def __init__(self):
+        self.yt_service = YouTubeDownloader()
+
+    @property
+    def source_type(self) -> SourceType:
+        return SourceType.YOUTUBE
+
+    def supports(self, source: str) -> bool:
+        return bool(re.match(r"^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/.+", source.strip(), re.IGNORECASE))
+
+    def validate(self, source: str) -> Tuple[bool, Optional[str]]:
+        if not self.supports(source):
+            return False, "Not a valid YouTube URL format"
+        return True, None
+
+    async def probe(self, source: str) -> MediaMetadata:
+        try:
+            info = await self.yt_service.extract_info(source.strip())
+            return MediaMetadata(
+                source_type=SourceType.YOUTUBE,
+                source_uri=source,
+                filename=f"{info.get('title', 'youtube_video')}.mp4",
+                duration=float(info.get('duration', 0.0)),
+                resolution=f"{info.get('width', 1920)}x{info.get('height', 1080)}",
+                width=int(info.get('width', 1920)),
+                height=int(info.get('height', 1080)),
+                fps=float(info.get('fps', 30.0)),
+                thumbnail=info.get('thumbnail')
+            )
+        except Exception as e:
+            logger.warning(f"Failed to probe YouTube URL: {e}")
+            return MediaMetadata(
+                source_type=SourceType.YOUTUBE,
+                source_uri=source,
+                filename="youtube_video.mp4"
+            )
+
+    async def import_media(self, source: str, target_dir: Path) -> Path:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        out_file = await self.yt_service.download(source.strip(), target_dir)
+        return Path(out_file).resolve()
