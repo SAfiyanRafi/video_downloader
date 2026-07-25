@@ -4,10 +4,25 @@ from fastapi.responses import FileResponse
 
 from app.models.job import JobCreateRequest, JobResponse, JobDownloadsResponse
 from app.services.jobs.job_manager import job_manager
+from app.services.metadata.inspector import metadata_inspector, VideoMetadataInspection
 from app.utils.validators import validate_youtube_url
 from app.core.config import settings
 
 router = APIRouter()
+
+@router.post("/inspect", response_model=VideoMetadataInspection)
+async def inspect_url(url: str):
+    """
+    Pre-flight metadata inspection for a YouTube URL before creating a job.
+    """
+    clean_url = validate_youtube_url(url)
+    try:
+        return await metadata_inspector.inspect_url(clean_url)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Metadata inspection failed: {str(e)}"
+        )
 
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 async def create_job(request: JobCreateRequest):
