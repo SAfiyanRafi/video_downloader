@@ -19,7 +19,7 @@ def test_mcp_tools_endpoint():
 def test_create_job_invalid_url():
     response = client.post(
         "/api/v1/jobs",
-        json={"url": "https://invalidurl.com", "parts": 4}
+        json={"url": "ftp://invalidurl.com", "parts": 4}
     )
     assert response.status_code == 400
 

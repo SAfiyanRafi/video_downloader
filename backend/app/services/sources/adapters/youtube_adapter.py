@@ -18,11 +18,19 @@ class YouTubeAdapter(BaseSourceAdapter):
         return SourceType.YOUTUBE
 
     def supports(self, source: str) -> bool:
-        return bool(re.match(r"^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/.+", source.strip(), re.IGNORECASE))
+        s = source.strip().lower()
+        if not (s.startswith("http://") or s.startswith("https://")):
+            return False
+        if ".m3u8" in s or ".mpd" in s:
+            return False
+        if any(s.endswith(ext) or f"{ext}?" in s for ext in [".mp4", ".mov", ".mkv", ".webm", ".avi"]):
+            return False
+        return True
 
     def validate(self, source: str) -> Tuple[bool, Optional[str]]:
-        if not self.supports(source):
-            return False, "Not a valid YouTube URL format"
+        s = source.strip().lower()
+        if not (s.startswith("http://") or s.startswith("https://")):
+            return False, "Invalid web URL format. URL must start with http:// or https://"
         return True, None
 
     async def probe(self, source: str) -> MediaMetadata:

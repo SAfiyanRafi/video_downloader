@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 
 from app.models.job import JobCreateRequest, JobResponse, JobDownloadsResponse
 from app.services.jobs.job_manager import job_manager
+from app.services.sources.source_manager import source_manager
 from app.utils.validators import validate_youtube_url
 from app.core.config import settings
 
@@ -15,7 +16,13 @@ async def create_job(request: JobCreateRequest):
     Submits a new YouTube video splitting job.
     Accepts YouTube URL, desired split parts (2 to 50), quality option, and optional channel profile ID.
     """
-    clean_url = validate_youtube_url(request.url)
+    valid, err = source_manager.validate_source(request.url)
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err or "Invalid media source URL or file path"
+        )
+    clean_url = request.url.strip()
     
     if request.parts < settings.MIN_SPLIT_PARTS or request.parts > settings.MAX_SPLIT_PARTS:
         raise HTTPException(
