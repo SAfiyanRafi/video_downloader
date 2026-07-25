@@ -19,7 +19,6 @@ from app.services.branding.channel_service import ChannelService
 from app.services.branding.branding_service import BrandingService
 from app.services.storage.local_storage import LocalStorageProvider
 from app.services.zip.zip_service import ZipService
-from app.services.workflow.workflow_executor import workflow_execution_engine
 from app.core.config import settings
 
 logger = logging.getLogger("yt_splitter")
@@ -175,36 +174,197 @@ class JobManager:
         if not state:
             return
 
-        def _update_cb(pct: float, msg: str):
-            state.progress = pct
-            state.message = msg
-            if pct < 15.0:
-                state.status = JobStatus.DOWNLOADING
-            elif pct < 50.0:
-                state.status = JobStatus.ANALYZING
-            elif pct < 70.0:
-                state.status = JobStatus.SPLITTING
-            elif pct < 85.0:
-                state.status = JobStatus.BRANDING
-            elif pct < 95.0:
-                state.status = JobStatus.ZIPPING
-            else:
-                state.status = JobStatus.COMPLETED
-            state.updated_at = datetime.now(timezone.utc)
+        job_dir = self.storage.get_job_directory(job_id)
 
         try:
+            # 1. DOWNLOADING STAGE (0% -> 40%)
             state.status = JobStatus.DOWNLOADING
-            state.message = "Initializing dynamic workflow engine..."
+            state.message = "Downloading video from YouTube..."
             state.updated_at = datetime.now(timezone.utc)
 
-            proj = await workflow_execution_engine.execute_job_pipeline(
-                state=state,
-                update_progress_cb=_update_cb
+            def _download_progress(pct: float):
+                # Scale download progress into 0-40% total job progress
+                state.progress = (pct / 100.0) * 40.0
+                state.updated_at = datetime.now(timezone.utc)
+
+            downloaded_video = await self.downloader.download(
+                source=state.url,
+                output_dir=job_dir,
+                quality=state.quality,
+                progress_callback=_download_progress
+            )
+            state.progress = 40.0
+
+            # 2. ANALYZING METADATA STAGE (40% -> 50%)
+            state.status = JobStatus.ANALYZING
+            state.message = "Analyzing video metadata and split markers..."
+            state.progress = 45.0
+            state.updated_at = datetime.now(timezone.utc)
+
+            metadata = await self.ffprobe.get_metadata(downloaded_video)
+            state.metadata = metadata
+
+            if metadata.duration <= 0:
+                raise ValueError("Could not determine valid video duration")
+
+            if metadata.duration > settings.MAX_VIDEO_DURATION_SECONDS:
+                raise ValueError(f"Video duration ({metadata.duration:.0f}s) exceeds maximum allowed ({settings.MAX_VIDEO_DURATION_SECONDS}s)")
+
+            # 3. CALCULATE SPLITS & SPLITTING STAGE (50% -> 85%)
+            state.status = JobStatus.SPLITTING
+            state.message = f"Splitting video into {state.parts} equal segments..."
+            state.progress = 50.0
+            state.updated_at = datetime.now(timezone.utc)
+
+            segments = self.splitter.calculate_splits(metadata.duration, state.parts)
+            state.segments = segments
+
+            def _split_progress(done: int, total: int):
+                # Scale splitting progress into 50% -> 85% range
+                frac = done / total
+                state.progress = 50.0 + (frac * 35.0)
+                state.message = f"Splitting clip {done}/{total}..."
+                state.updated_at = datetime.now(timezone.utc)
+
+            clips_dir = job_dir / "clips"
+            generated_clip_paths = await self.ffmpeg.split_video(
+                input_file=downloaded_video,
+                output_dir=clips_dir,
+                segments=segments,
+                progress_callback=_split_progress
             )
 
+            final_clip_paths = generated_clip_paths
+
+            # 4. BRANDING & DIMENSION TRANSFORMATION STAGE (70% -> 85%)
+            if state.channel or state.aspect_ratio != AspectRatioOption.ORIGINAL:
+                state.status = JobStatus.BRANDING
+                state.message = f"Applying branding & aspect ratio ({state.aspect_ratio.value})..."
+                state.progress = 70.0
+                state.updated_at = datetime.now(timezone.utc)
+
+                intro_path = None
+                outro_path = None
+                prefix = "Media"
+
+                if state.channel:
+                    logger.info(f"[Job {job_id}] Selected channel: '{state.channel}'. Loading profile...")
+                    profile = self.channel_service.get_channel(state.channel)
+                    root_dir = self.channel_service.root_dir
+
+                    if profile.intro:
+                        intro_path = root_dir / profile.intro
+                        if not intro_path.exists():
+                            err_msg = f"Intro file missing for channel '{state.channel}' at {intro_path}"
+                            logger.error(f"[Job {job_id}] {err_msg}")
+                            raise FileNotFoundError(err_msg)
+                        logger.info(f"[Job {job_id}] Intro found: {intro_path}")
+
+                    if profile.outro:
+                        outro_path = root_dir / profile.outro
+                        if not outro_path.exists():
+                            err_msg = f"Outro file missing for channel '{state.channel}' at {outro_path}"
+                            logger.error(f"[Job {job_id}] {err_msg}")
+                            raise FileNotFoundError(err_msg)
+                        logger.info(f"[Job {job_id}] Outro found: {outro_path}")
+
+                    prefix = profile.filename_prefix or profile.id
+
+                branded_dir = job_dir / "branded"
+                branded_clip_paths = []
+                total_clips = len(generated_clip_paths)
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+                for idx, raw_clip in enumerate(generated_clip_paths):
+                    part_num = idx + 1
+                    
+                    if state.naming_template == NamingTemplate.ORIGINAL_CLIP:
+                        branded_filename = f"Clip_{part_num:02d}.mp4"
+                    elif state.naming_template == NamingTemplate.DATE_CHANNEL_PART:
+                        branded_filename = f"{today_str}_{prefix}_Part_{part_num:02d}.mp4"
+                    else:
+                        branded_filename = f"{prefix}_Part_{part_num:02d}.mp4"
+
+                    branded_output = branded_dir / branded_filename
+
+                    logger.info(f"[Job {job_id}] Branding clip {part_num}/{total_clips} with Intro/Outro -> {branded_filename}...")
+                    await self.branding_service.add_intro_outro(
+                        clip_path=raw_clip,
+                        output_path=branded_output,
+                        intro_path=intro_path,
+                        outro_path=outro_path,
+                        aspect_ratio=state.aspect_ratio,
+                        export_preset=state.export_preset,
+                        padding_mode=state.padding_mode,
+                        crop_fill=state.crop_fill
+                    )
+                    
+                    if not branded_output.exists() or branded_output.stat().st_size == 0:
+                        raise RuntimeError(f"Branding failed: Output clip {branded_filename} was not created.")
+
+                    logger.info(f"[Job {job_id}] Branding completed for clip {part_num}/{total_clips}: {branded_filename} ({branded_output.stat().st_size} bytes)")
+                    branded_clip_paths.append(branded_output)
+
+                    # Update SegmentInfo records to point strictly to the branded output clip
+                    if idx < len(state.segments):
+                        state.segments[idx].filename = f"branded/{branded_filename}"
+
+                    # Update progress
+                    frac = part_num / total_clips
+                    state.progress = 70.0 + (frac * 15.0)
+                    state.message = f"Branding clip {part_num}/{total_clips} ({state.aspect_ratio.value})..."
+                    state.updated_at = datetime.now(timezone.utc)
+
+                # Cleanup intermediate raw split clips to save disk space
+                try:
+                    for raw_c in generated_clip_paths:
+                        if raw_c.exists():
+                            raw_c.unlink()
+                    logger.info(f"[Job {job_id}] Intermediate raw split clips cleaned up successfully.")
+                except Exception as clean_err:
+                    logger.warning(f"[Job {job_id}] Failed to cleanup intermediate split clips: {clean_err}")
+
+                final_clip_paths = branded_clip_paths
+            else:
+                logger.info(f"[Job {job_id}] No channel branding or aspect ratio change requested. Using raw split clips.")
+                # Update segment filenames relative to job directory
+                for seg in state.segments:
+                    seg.filename = f"clips/{seg.filename}"
+
+            # 5. ZIPPING STAGE (85% -> 99%)
+            state.status = JobStatus.ZIPPING
+            state.message = "Creating ZIP archive of video parts..."
+            state.progress = 90.0
+            state.updated_at = datetime.now(timezone.utc)
+
+            zip_output_path = job_dir / "video_parts.zip"
+            await self.zipper.create_zip_archive(final_clip_paths, zip_output_path)
+            state.zip_filename = "video_parts.zip"
+
+            # Auto-export ZIP and clips to default download directory (C:\Users\ABC\OneDrive\Desktop\Youtube\Download)
+            try:
+                dest_dir = settings.DEFAULT_DOWNLOAD_DIR / f"Job_{job_id}"
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Copy ZIP file
+                if zip_output_path.exists():
+                    dest_zip = dest_dir / f"SplitTube_{job_id}.zip"
+                    dest_zip.write_bytes(zip_output_path.read_bytes())
+                
+                # Copy clips
+                for clip_path in final_clip_paths:
+                    if clip_path.exists():
+                        dest_clip = dest_dir / clip_path.name
+                        dest_clip.write_bytes(clip_path.read_bytes())
+                
+                logger.info(f"[Job {job_id}] Auto-exported ZIP and clips to default download folder: {dest_dir}")
+            except Exception as exp_err:
+                logger.warning(f"[Job {job_id}] Auto-export to default download folder failed: {exp_err}")
+
+            # 6. COMPLETED
             state.status = JobStatus.COMPLETED
             state.progress = 100.0
-            state.message = "Workflow pipeline processing completed successfully"
+            state.message = "Video splitting and branding completed successfully"
             state.updated_at = datetime.now(timezone.utc)
             logger.info(f"Job {job_id} successfully completed.")
 

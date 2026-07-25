@@ -5,6 +5,7 @@ import {
 import type { SubtitleStylePreset, SubtitleMode, StudioJobResponse } from '../../types/studio';
 import { createStudioJob, fetchStudioJobStatus, scanWatchFolder } from '../../services/studioApi';
 import { AIUploadHelper } from './AIUploadHelper';
+import { HookPanel } from '../hooks/HookPanel';
 
 export const StudioDashboard: React.FC = () => {
   const [detectedVideos, setDetectedVideos] = useState<string[]>([]);
@@ -141,6 +142,16 @@ export const StudioDashboard: React.FC = () => {
                 onChange={(e) => setSelectedVideo(e.target.value)}
                 placeholder="Enter absolute path to video file (e.g. C:\Users\...\video.mp4)"
                 className="w-full px-3.5 py-3 rounded-xl bg-slate-950 border border-gray-800 text-white text-xs font-mono focus:ring-2 focus:ring-purple-500 focus:outline-none"
+              />
+            )}
+
+            {/* Smart Hook Detection Engine Panel */}
+            {selectedVideo && (
+              <HookPanel
+                videoPath={selectedVideo}
+                onSelectHook={(cand) => {
+                  console.log('Selected hook candidate:', cand);
+                }}
               />
             )}
           </div>

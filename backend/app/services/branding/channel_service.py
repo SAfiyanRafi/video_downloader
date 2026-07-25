@@ -60,14 +60,15 @@ class ChannelService:
 
     def validate_channel_assets(self, channel_id: str) -> ChannelProfile:
         profile = self.get_channel(channel_id)
-        if profile.intro:
-            intro_p = self.root_dir / profile.intro
-            if not intro_p.exists():
-                raise FileNotFoundError(f"Channel '{channel_id}' intro missing: {intro_p}")
-        if profile.outro:
-            outro_p = self.root_dir / profile.outro
-            if not outro_p.exists():
-                raise FileNotFoundError(f"Channel '{channel_id}' outro missing: {outro_p}")
-        return profile
 
-channel_service = ChannelService()
+        if profile.intro:
+            intro_path = self.root_dir / profile.intro
+            if not intro_path.exists():
+                raise FileNotFoundError(f"Intro video for channel '{channel_id}' not found at {intro_path}")
+
+        if profile.outro:
+            outro_path = self.root_dir / profile.outro
+            if not outro_path.exists():
+                raise FileNotFoundError(f"Outro video for channel '{channel_id}' not found at {outro_path}")
+
+        return profile
