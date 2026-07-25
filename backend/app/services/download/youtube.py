@@ -15,6 +15,13 @@ class YouTubeDownloader(BaseDownloader):
     Downloads YouTube videos using yt-dlp library with progress hooks.
     """
 
+    async def extract_info(self, source: str) -> dict:
+        loop = asyncio.get_running_loop()
+        def _get():
+            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+                return ydl.extract_info(source, download=False)
+        return await loop.run_in_executor(None, _get)
+
     async def download(
         self,
         source: str,
