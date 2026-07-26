@@ -48,6 +48,18 @@ class HlsAdapter(BaseSourceAdapter):
         url = source.strip()
         out_file = target_dir / "hls_stream.mp4"
 
+        # Tier 1: Try yt-dlp first (handles HLS AES decryption, custom headers, and multi-part ts merging)
+        from app.services.download.youtube import YouTubeDownloader
+        try:
+            logger.info(f"[HlsAdapter] Downloading HLS stream via yt-dlp: {url}")
+            yt_dl = YouTubeDownloader()
+            dl_file = await yt_dl.download(url, target_dir, progress_callback=progress_callback)
+            if dl_file and dl_file.exists() and dl_file.stat().st_size > 0:
+                return dl_file
+        except Exception as e:
+            logger.warning(f"[HlsAdapter] yt-dlp HLS download failed: {e}. Falling back to FFmpeg stream dump...")
+
+        # Tier 2: Try FFmpeg stream copy
         cmd = [
             self.ffmpeg_bin, "-y",
             "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -57,9 +69,9 @@ class HlsAdapter(BaseSourceAdapter):
             str(out_file)
         ]
 
-        logger.info(f"[HlsAdapter] Dumping HLS stream {url} -> {out_file.name}...")
+        logger.info(f"[HlsAdapter] Dumping HLS stream via FFmpeg {url} -> {out_file.name}...")
         returncode, _, err = await asyncio.to_thread(_exec_subprocess, cmd)
-        if returncode != 0:
-            raise RuntimeError(f"HLS stream dump failed: {err[:200]}")
+        if returncode == 0 and out_file.exists() and out_file.stat().st_size > 0:
+            return out_file
 
-        return out_file
+        raise RuntimeError(f"HLS stream dump failed: {err[-300:] if err else 'Unknown error'}")
