@@ -70,7 +70,10 @@ class HlsAdapter(BaseSourceAdapter):
             "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "-headers", f"Referer: {scheme}://{netloc}/\r\n",
             "-i", url,
-            "-c", "copy",
+            "-map", "0:v?",
+            "-map", "0:a?",
+            "-c:v", "copy",
+            "-c:a", "copy",
             str(out_file)
         ]
 
