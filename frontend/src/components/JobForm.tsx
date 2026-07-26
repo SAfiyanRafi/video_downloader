@@ -18,8 +18,7 @@ interface JobFormProps {
     exportPreset: ExportPreset,
     paddingMode: PaddingMode,
     namingTemplate: NamingTemplate,
-    cropFill: boolean,
-    channel?: string
+    cropFill: boolean
   ) => void;
   isLoading: boolean;
   error?: string | null;
@@ -32,9 +31,8 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('original');
   const [exportPreset, setExportPreset] = useState<ExportPreset>('high_quality');
   const [paddingMode, setPaddingMode] = useState<PaddingMode>('black_bars');
-  const [namingTemplate, setNamingTemplate] = useState<NamingTemplate>('{channel}_Part_{number}');
+  const [namingTemplate, setNamingTemplate] = useState<NamingTemplate>('{original}_Clip_{number}');
   const [cropFill, setCropFill] = useState(false);
-  const [channel, setChannel] = useState<string>('');
   const [urlTouched, setUrlTouched] = useState(false);
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('custom');
   const [workflows, setWorkflows] = useState<WorkflowProfile[]>([]);
@@ -52,7 +50,6 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
     if (wf.aspect_ratio === '9:16') {
       setAspectRatio('9:16');
       setPaddingMode('blurred');
-      setChannel(''); // Shorts workflow disables intro/outro branding
     } else if (wf.aspect_ratio === '16:9') {
       setAspectRatio('16:9');
       setPaddingMode('black_bars');
@@ -100,7 +97,7 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
     if (!isUrlValid) return;
     onSubmit(
       url.trim(), parts, quality, aspectRatio,
-      exportPreset, paddingMode, namingTemplate, cropFill, channel || undefined
+      exportPreset, paddingMode, namingTemplate, cropFill
     );
   };
 
@@ -441,6 +438,8 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
             </select>
           </div>
         </div>
+
+
 
         {/* Constant Target Save Location Section */}
         <div className="p-4 rounded-2xl bg-slate-900/90 border border-gray-800 space-y-2">

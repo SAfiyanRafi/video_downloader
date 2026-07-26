@@ -12,9 +12,8 @@ export async function createSplitJob(
   aspectRatio: AspectRatioOption = 'original',
   exportPreset: ExportPreset = 'high_quality',
   paddingMode: PaddingMode = 'black_bars',
-  namingTemplate: NamingTemplate = '{channel}_Part_{number}',
-  cropFill: boolean = false,
-  channel?: string
+  namingTemplate: NamingTemplate = '{original}_Clip_{number}',
+  cropFill: boolean = false
 ): Promise<JobResponse> {
   try {
     const payload: any = {
@@ -27,9 +26,6 @@ export async function createSplitJob(
       naming_template: namingTemplate,
       crop_fill: cropFill
     };
-    if (channel) {
-      payload.channel = channel;
-    }
 
     const response = await fetch(`${API_BASE}/jobs`, {
       method: 'POST',
@@ -50,19 +46,6 @@ export async function createSplitJob(
       throw new Error('Backend server disconnected. Please verify Uvicorn server is running on http://localhost:8000.');
     }
     throw err;
-  }
-}
-
-export async function fetchChannels(): Promise<import('../types/job').ChannelProfile[]> {
-  try {
-    const response = await fetch(`${API_BASE}/channels`);
-    if (!response.ok) {
-      return [];
-    }
-    return response.json();
-  } catch (err) {
-    console.warn('Failed to fetch channels from backend:', err);
-    return [];
   }
 }
 

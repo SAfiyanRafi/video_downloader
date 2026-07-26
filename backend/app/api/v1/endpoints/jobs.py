@@ -30,17 +30,6 @@ async def create_job(request: JobCreateRequest):
             detail=f"Parts must be between {settings.MIN_SPLIT_PARTS} and {settings.MAX_SPLIT_PARTS}"
         )
 
-    if request.channel:
-        from app.services.branding.channel_service import ChannelService
-        cs = ChannelService()
-        try:
-            cs.validate_channel_assets(request.channel)
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Channel profile '{request.channel}' not found: {str(e)}"
-            )
-
     try:
         return job_manager.create_job(
             url=clean_url,

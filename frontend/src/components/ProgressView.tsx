@@ -18,9 +18,9 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ job, onCancel }) => 
   }, []);
 
   const stages: { status: JobStatus; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { status: 'downloading', label: 'Downloading Media Source', icon: Download },
-    { status: 'analyzing', label: 'Extracting Metadata (FFprobe)', icon: Cpu },
-    { status: 'splitting', label: 'Lossless FFmpeg Splitting', icon: Scissors },
+    { status: 'downloading', label: 'Importing & Downloading Media', icon: Download },
+    { status: 'analyzing', label: 'Extracting Metadata & Specs', icon: Cpu },
+    { status: 'splitting', label: 'Lossless FFmpeg Splitting & Processing', icon: Scissors },
     { status: 'zipping', label: 'Packaging ZIP Archive', icon: Archive },
     { status: 'completed', label: 'Ready for Download', icon: CheckCircle2 },
   ];

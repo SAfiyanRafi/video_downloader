@@ -41,7 +41,6 @@ class JobStatus(str, Enum):
     DOWNLOADING = "downloading"
     ANALYZING = "analyzing"
     SPLITTING = "splitting"
-    BRANDING = "branding"
     ZIPPING = "zipping"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -55,7 +54,6 @@ class JobCreateRequest(BaseModel):
     padding_mode: PaddingMode = Field(default=PaddingMode.BLACK_BARS, description="Padding style for aspect ratio letterboxing (black_bars, blurred, solid_color)")
     naming_template: NamingTemplate = Field(default=NamingTemplate.CHANNEL_PART, description="Filename naming pattern template")
     crop_fill: bool = Field(default=False, description="Enable cropping instead of fitting whole frame")
-    channel: Optional[str] = Field(default=None, description="Optional channel profile ID for intro/outro branding")
 
 class JobResponse(BaseModel):
     job_id: str

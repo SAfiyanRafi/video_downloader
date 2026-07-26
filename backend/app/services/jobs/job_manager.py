@@ -15,7 +15,7 @@ from app.services.download.youtube import YouTubeDownloader
 from app.services.metadata.ffprobe_service import FFprobeService
 from app.services.split.equal_split_service import EqualSplitService
 from app.services.processing.ffmpeg_service import FFmpegService
-from app.services.processing.aspect_service import AspectService
+from app.services.processing.aspect_ratio_service import AspectRatioService
 from app.services.storage.local_storage import LocalStorageProvider
 from app.services.sources.source_manager import source_manager
 from app.services.zip.zip_service import ZipService
@@ -28,14 +28,13 @@ class JobState:
         self,
         job_id: str,
         url: str,
-        parts: int,
-        quality: QualityOption,
+        parts: int = 4,
+        quality: QualityOption = QualityOption.BEST,
         aspect_ratio: AspectRatioOption = AspectRatioOption.ORIGINAL,
         export_preset: ExportPreset = ExportPreset.HIGH,
         padding_mode: PaddingMode = PaddingMode.BLACK_BARS,
         naming_template: NamingTemplate = NamingTemplate.CHANNEL_PART,
-        crop_fill: bool = False,
-        channel: Optional[str] = None
+        crop_fill: bool = False
     ):
         self.job_id = job_id
         self.url = url
@@ -46,16 +45,17 @@ class JobState:
         self.padding_mode = padding_mode
         self.naming_template = naming_template
         self.crop_fill = crop_fill
-        self.channel = channel
+
         self.status = JobStatus.PENDING
         self.progress = 0.0
         self.message = "Job queued"
-        self.error: Optional[str] = None
         self.created_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
+
         self.metadata: Optional[VideoMetadata] = None
-        self.segments: list[SegmentInfo] = []
-        self.zip_filename: Optional[str] = None
+        self.segments: List[SegmentInfo] = []
+        self.zip_path: Optional[str] = None
+        self.download_url: Optional[str] = None
         self.task: Optional[asyncio.Task] = None
 
 class JobManager:
@@ -73,7 +73,8 @@ class JobManager:
         self.downloader = YouTubeDownloader()
         self.ffprobe = FFprobeService()
         self.splitter = EqualSplitService()
-        self.aspect_service = AspectService()
+        self.ffmpeg = FFmpegService()
+        self.aspect_service = AspectRatioService()
         self.zipper = ZipService()
 
     def create_job(
@@ -85,17 +86,12 @@ class JobManager:
         export_preset: ExportPreset = ExportPreset.HIGH,
         padding_mode: PaddingMode = PaddingMode.BLACK_BARS,
         naming_template: NamingTemplate = NamingTemplate.CHANNEL_PART,
-        crop_fill: bool = False,
-        channel: Optional[str] = None
+        crop_fill: bool = False
     ) -> JobResponse:
-        # Validate channel profile if specified
-        if channel:
-            self.channel_service.validate_channel_assets(channel)
-
         job_id = str(uuid.uuid4())[:8]
         state = JobState(
             job_id, url, parts, quality, aspect_ratio,
-            export_preset, padding_mode, naming_template, crop_fill, channel
+            export_preset, padding_mode, naming_template, crop_fill
         )
         self.jobs[job_id] = state
 
@@ -232,46 +228,58 @@ class JobManager:
                 progress_callback=_split_progress
             )
 
-            # 4. ASPECT RATIO STAGE (70% -> 85%)
-            final_clip_paths = []
-            if state.aspect_ratio != AspectRatioOption.ORIGINAL or state.crop_fill:
-                state.message = f"Optimizing aspect ratio ({state.aspect_ratio.value})..."
+            final_clip_paths = generated_clip_paths
+
+            # 4. ASPECT RATIO TRANSFORMATION STAGE (70% -> 85%)
+            if state.aspect_ratio != AspectRatioOption.ORIGINAL:
+                state.message = f"Applying aspect ratio ({state.aspect_ratio.value})..."
                 state.progress = 70.0
                 state.updated_at = datetime.now(timezone.utc)
 
-                formatted_dir = job_dir / "formatted"
-                formatted_dir.mkdir(parents=True, exist_ok=True)
+                processed_dir = job_dir / "processed"
+                processed_dir.mkdir(parents=True, exist_ok=True)
+                processed_clip_paths = []
                 total_clips = len(generated_clip_paths)
-                formatted_clip_paths = []
+                prefix = "Media"
 
                 for idx, raw_clip in enumerate(generated_clip_paths):
                     part_num = idx + 1
-                    formatted_filename = f"Part_{part_num:02d}.mp4"
-                    formatted_output = formatted_dir / formatted_filename
+                    clip_filename = f"{prefix}_Part_{part_num:02d}.mp4"
+                    processed_output = processed_dir / clip_filename
 
-                    logger.info(f"[Job {job_id}] Transforming aspect ratio {part_num}/{total_clips} -> {formatted_filename}...")
-                    await self.aspect_service.transform_aspect_ratio(
+                    logger.info(f"[Job {job_id}] Transforming aspect ratio for clip {part_num}/{total_clips} -> {clip_filename}...")
+                    await self.aspect_service.apply_aspect_ratio(
                         clip_path=raw_clip,
-                        output_path=formatted_output,
+                        output_path=processed_output,
                         aspect_ratio=state.aspect_ratio,
                         padding_mode=state.padding_mode,
-                        crop_fill=state.crop_fill
+                        progress_callback=None
                     )
 
-                    formatted_clip_paths.append(formatted_output)
+                    if not processed_output.exists() or processed_output.stat().st_size == 0:
+                        raise RuntimeError(f"Aspect ratio transformation failed: Output clip {clip_filename} was not created.")
+
+                    processed_clip_paths.append(processed_output)
 
                     if idx < len(state.segments):
-                        state.segments[idx].filename = f"formatted/{formatted_filename}"
+                        state.segments[idx].filename = f"processed/{clip_filename}"
 
                     frac = part_num / total_clips
                     state.progress = 70.0 + (frac * 15.0)
-                    state.message = f"Processing clip {part_num}/{total_clips} ({state.aspect_ratio.value})..."
+                    state.message = f"Transformed aspect ratio for clip {part_num}/{total_clips} ({state.aspect_ratio.value})..."
                     state.updated_at = datetime.now(timezone.utc)
 
-                final_clip_paths = formatted_clip_paths
+                # Cleanup intermediate raw split clips
+                try:
+                    for raw_c in generated_clip_paths:
+                        if raw_c.exists():
+                            raw_c.unlink()
+                except Exception as clean_err:
+                    logger.warning(f"[Job {job_id}] Failed to cleanup intermediate split clips: {clean_err}")
+
+                final_clip_paths = processed_clip_paths
             else:
-                logger.info(f"[Job {job_id}] Original 1:1 aspect ratio requested. Using zero-reencode raw split clips.")
-                final_clip_paths = generated_clip_paths
+                logger.info(f"[Job {job_id}] Aspect ratio is ORIGINAL. Using 0-second lossless split clips.")
                 for seg in state.segments:
                     seg.filename = f"clips/{seg.filename}"
 

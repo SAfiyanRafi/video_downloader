@@ -13,7 +13,6 @@ export type JobStatus =
   | 'downloading'
   | 'analyzing'
   | 'splitting'
-  | 'branding'
   | 'zipping'
   | 'completed'
   | 'failed';

@@ -111,15 +111,14 @@ export const App: React.FC = () => {
     exportPreset: ExportPreset,
     paddingMode: PaddingMode,
     namingTemplate: NamingTemplate,
-    cropFill: boolean,
-    channel?: string
+    cropFill: boolean
   ) => {
     setIsSubmitting(true);
     setError(null);
     try {
       const job = await createSplitJob(
         url, parts, quality, aspectRatio,
-        exportPreset, paddingMode, namingTemplate, cropFill, channel
+        exportPreset, paddingMode, namingTemplate, cropFill
       );
       setCurrentJob(job);
       setDownloads(null);
