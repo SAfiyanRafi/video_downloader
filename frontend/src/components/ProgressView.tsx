@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Download, Cpu, Scissors, Archive, CheckCircle2, Clock, Loader2, AlertCircle, XCircle, Tv } from 'lucide-react';
+import { Download, Cpu, Scissors, Archive, CheckCircle2, Clock, Loader2, AlertCircle, XCircle } from 'lucide-react';
 import type { JobResponse, JobStatus } from '../types/job';
 
 interface ProgressViewProps {
@@ -18,16 +18,15 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ job, onCancel }) => 
   }, []);
 
   const stages: { status: JobStatus; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { status: 'downloading', label: 'Downloading YouTube Video', icon: Download },
+    { status: 'downloading', label: 'Downloading Media Source', icon: Download },
     { status: 'analyzing', label: 'Extracting Metadata (FFprobe)', icon: Cpu },
     { status: 'splitting', label: 'Lossless FFmpeg Splitting', icon: Scissors },
-    { status: 'branding', label: 'Applying Intro & Outro Branding', icon: Tv },
     { status: 'zipping', label: 'Packaging ZIP Archive', icon: Archive },
     { status: 'completed', label: 'Ready for Download', icon: CheckCircle2 },
   ];
 
   const getStageState = (stageStatus: JobStatus) => {
-    const order: JobStatus[] = ['pending', 'downloading', 'analyzing', 'splitting', 'branding', 'zipping', 'completed'];
+    const order: JobStatus[] = ['pending', 'downloading', 'analyzing', 'splitting', 'zipping', 'completed'];
     const currentIndex = order.indexOf(job.status);
     const stageIndex = order.indexOf(stageStatus);
 

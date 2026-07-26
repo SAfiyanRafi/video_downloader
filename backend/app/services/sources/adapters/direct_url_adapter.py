@@ -61,7 +61,7 @@ class DirectUrlAdapter(BaseSourceAdapter):
 
         # Tier 2: Try FFmpeg stream copy with browser headers
         from app.services.processing.ffmpeg_service import get_ffmpeg_executable
-        from app.services.branding.branding_service import _exec_subprocess
+        from app.utils.process_utils import _exec_subprocess
 
         ffmpeg_bin = get_ffmpeg_executable()
         cmd = [

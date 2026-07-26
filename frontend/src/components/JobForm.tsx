@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Video, Layers, Settings2, Play, Sparkles, AlertCircle,
-  Tv, Crop, Smartphone, Monitor, Square, Maximize2, Sliders, FileText, Image, Folder, Workflow
+  Crop, Smartphone, Monitor, Square, Maximize2, Sliders, FileText, Image, Folder, Workflow
 } from 'lucide-react';
 import type {
-  QualityOption, AspectRatioOption, ExportPreset, PaddingMode, NamingTemplate, ChannelProfile
+  QualityOption, AspectRatioOption, ExportPreset, PaddingMode, NamingTemplate
 } from '../types/job';
 import type { WorkflowProfile } from '../types/workflow';
-import { fetchChannels } from '../services/api';
 import { fetchWorkflows } from '../services/workflowApi';
 
 interface JobFormProps {
@@ -26,11 +25,6 @@ interface JobFormProps {
   error?: string | null;
 }
 
-const DEFAULT_CHANNELS: ChannelProfile[] = [
-  { id: 'rhymes4ever', display_name: 'Rhymes4ever (Kids Intro & Outro)', filename_prefix: 'Rhymes4ever' },
-  { id: 'cut_clips', display_name: 'Cut_Clips (Shorts Intro & Outro)', filename_prefix: 'Cut_Clips' }
-];
-
 export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) => {
   const [url, setUrl] = useState('');
   const [parts, setParts] = useState(4);
@@ -41,24 +35,11 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const [namingTemplate, setNamingTemplate] = useState<NamingTemplate>('{channel}_Part_{number}');
   const [cropFill, setCropFill] = useState(false);
   const [channel, setChannel] = useState<string>('');
-  const [channels, setChannels] = useState<ChannelProfile[]>(DEFAULT_CHANNELS);
   const [urlTouched, setUrlTouched] = useState(false);
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('custom');
   const [workflows, setWorkflows] = useState<WorkflowProfile[]>([]);
 
   useEffect(() => {
-    fetchChannels()
-      .then((data) => {
-        if (data && data.length > 0) {
-          setChannels(data);
-        } else {
-          setChannels(DEFAULT_CHANNELS);
-        }
-      })
-      .catch(() => {
-        setChannels(DEFAULT_CHANNELS);
-      });
-
     fetchWorkflows().then((data) => {
       if (data && data.length > 0) {
         setWorkflows(data);
@@ -459,36 +440,6 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
               <option value="{date}_{channel}_Part_{number}">2026-07-24_Rhymes4ever_Part_01.mp4</option>
             </select>
           </div>
-        </div>
-
-        {/* Channel Branding Profile Selector */}
-        <div className="space-y-3 pt-1">
-          <div className="flex items-center justify-between">
-            <label htmlFor="channel-select" className="text-xs sm:text-sm font-semibold text-gray-200 flex items-center space-x-2">
-              <Tv className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>Channel Profile Branding</span>
-            </label>
-            <span className="text-[11px] text-gray-400 font-mono">Auto Intro & Outro</span>
-          </div>
-
-          <div className="relative">
-            <select
-              id="channel-select"
-              value={channel}
-              onChange={(e) => setChannel(e.target.value)}
-              className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-slate-900 border border-gray-700 focus:border-rose-500 focus:ring-rose-500 text-white text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 transition-all cursor-pointer shadow-sm"
-            >
-              <option value="" className="bg-slate-900 text-white py-2">None (Standard Split without Intros/Outros)</option>
-              {(channels.length > 0 ? channels : DEFAULT_CHANNELS).map((chan) => (
-                <option key={chan.id} value={chan.id} className="bg-slate-900 text-white py-2 font-medium">
-                  🎬 {chan.display_name} (Auto Intro & Outro Branding)
-                </option>
-              ))}
-            </select>
-          </div>
-          <p className="text-[11px] text-gray-400">
-            Selecting a channel automatically prepends its intro video and appends its outro video to every split segment clip.
-          </p>
         </div>
 
         {/* Constant Target Save Location Section */}

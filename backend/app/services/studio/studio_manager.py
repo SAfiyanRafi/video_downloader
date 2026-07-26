@@ -8,7 +8,7 @@ from app.models.studio import StudioJobRequest, StudioJobResponse, SubtitleMode
 from app.services.studio.subtitle_service import SubtitleService
 from app.services.studio.audio_service import AudioProcessingService
 from app.services.processing.ffmpeg_service import get_ffmpeg_executable
-from app.services.branding.branding_service import _exec_subprocess
+from app.utils.process_utils import _exec_subprocess
 from app.core.config import settings
 
 logger = logging.getLogger("yt_splitter")

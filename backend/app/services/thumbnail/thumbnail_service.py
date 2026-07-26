@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 from app.services.processing.ffmpeg_service import get_ffmpeg_executable
-from app.services.branding.branding_service import _exec_subprocess
+from app.utils.process_utils import _exec_subprocess
 
 logger = logging.getLogger("yt_splitter")
 

@@ -15,8 +15,7 @@ from app.services.download.youtube import YouTubeDownloader
 from app.services.metadata.ffprobe_service import FFprobeService
 from app.services.split.equal_split_service import EqualSplitService
 from app.services.processing.ffmpeg_service import FFmpegService
-from app.services.branding.channel_service import ChannelService
-from app.services.branding.branding_service import BrandingService
+from app.services.processing.aspect_service import AspectService
 from app.services.storage.local_storage import LocalStorageProvider
 from app.services.sources.source_manager import source_manager
 from app.services.zip.zip_service import ZipService
@@ -74,9 +73,7 @@ class JobManager:
         self.downloader = YouTubeDownloader()
         self.ffprobe = FFprobeService()
         self.splitter = EqualSplitService()
-        self.ffmpeg = FFmpegService()
-        self.channel_service = ChannelService()
-        self.branding_service = BrandingService()
+        self.aspect_service = AspectService()
         self.zipper = ZipService()
 
     def create_job(
@@ -235,100 +232,46 @@ class JobManager:
                 progress_callback=_split_progress
             )
 
-            final_clip_paths = generated_clip_paths
-
-            # 4. BRANDING & DIMENSION TRANSFORMATION STAGE (70% -> 85%)
-            if state.channel or state.aspect_ratio != AspectRatioOption.ORIGINAL:
-                state.status = JobStatus.BRANDING
-                state.message = f"Applying branding & aspect ratio ({state.aspect_ratio.value})..."
+            # 4. ASPECT RATIO STAGE (70% -> 85%)
+            final_clip_paths = []
+            if state.aspect_ratio != AspectRatioOption.ORIGINAL or state.crop_fill:
+                state.message = f"Optimizing aspect ratio ({state.aspect_ratio.value})..."
                 state.progress = 70.0
                 state.updated_at = datetime.now(timezone.utc)
 
-                intro_path = None
-                outro_path = None
-                prefix = "Media"
-
-                if state.channel:
-                    logger.info(f"[Job {job_id}] Selected channel: '{state.channel}'. Loading profile...")
-                    profile = self.channel_service.get_channel(state.channel)
-                    root_dir = self.channel_service.root_dir
-
-                    if profile.intro:
-                        intro_path = root_dir / profile.intro
-                        if not intro_path.exists():
-                            err_msg = f"Intro file missing for channel '{state.channel}' at {intro_path}"
-                            logger.error(f"[Job {job_id}] {err_msg}")
-                            raise FileNotFoundError(err_msg)
-                        logger.info(f"[Job {job_id}] Intro found: {intro_path}")
-
-                    if profile.outro:
-                        outro_path = root_dir / profile.outro
-                        if not outro_path.exists():
-                            err_msg = f"Outro file missing for channel '{state.channel}' at {outro_path}"
-                            logger.error(f"[Job {job_id}] {err_msg}")
-                            raise FileNotFoundError(err_msg)
-                        logger.info(f"[Job {job_id}] Outro found: {outro_path}")
-
-                    prefix = profile.filename_prefix or profile.id
-
-                branded_dir = job_dir / "branded"
-                branded_clip_paths = []
+                formatted_dir = job_dir / "formatted"
+                formatted_dir.mkdir(parents=True, exist_ok=True)
                 total_clips = len(generated_clip_paths)
-                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                formatted_clip_paths = []
 
                 for idx, raw_clip in enumerate(generated_clip_paths):
                     part_num = idx + 1
-                    
-                    if state.naming_template == NamingTemplate.ORIGINAL_CLIP:
-                        branded_filename = f"Clip_{part_num:02d}.mp4"
-                    elif state.naming_template == NamingTemplate.DATE_CHANNEL_PART:
-                        branded_filename = f"{today_str}_{prefix}_Part_{part_num:02d}.mp4"
-                    else:
-                        branded_filename = f"{prefix}_Part_{part_num:02d}.mp4"
+                    formatted_filename = f"Part_{part_num:02d}.mp4"
+                    formatted_output = formatted_dir / formatted_filename
 
-                    branded_output = branded_dir / branded_filename
-
-                    logger.info(f"[Job {job_id}] Branding clip {part_num}/{total_clips} with Intro/Outro -> {branded_filename}...")
-                    await self.branding_service.add_intro_outro(
+                    logger.info(f"[Job {job_id}] Transforming aspect ratio {part_num}/{total_clips} -> {formatted_filename}...")
+                    await self.aspect_service.transform_aspect_ratio(
                         clip_path=raw_clip,
-                        output_path=branded_output,
-                        intro_path=intro_path,
-                        outro_path=outro_path,
+                        output_path=formatted_output,
                         aspect_ratio=state.aspect_ratio,
-                        export_preset=state.export_preset,
                         padding_mode=state.padding_mode,
                         crop_fill=state.crop_fill
                     )
-                    
-                    if not branded_output.exists() or branded_output.stat().st_size == 0:
-                        raise RuntimeError(f"Branding failed: Output clip {branded_filename} was not created.")
 
-                    logger.info(f"[Job {job_id}] Branding completed for clip {part_num}/{total_clips}: {branded_filename} ({branded_output.stat().st_size} bytes)")
-                    branded_clip_paths.append(branded_output)
+                    formatted_clip_paths.append(formatted_output)
 
-                    # Update SegmentInfo records to point strictly to the branded output clip
                     if idx < len(state.segments):
-                        state.segments[idx].filename = f"branded/{branded_filename}"
+                        state.segments[idx].filename = f"formatted/{formatted_filename}"
 
-                    # Update progress
                     frac = part_num / total_clips
                     state.progress = 70.0 + (frac * 15.0)
-                    state.message = f"Branding clip {part_num}/{total_clips} ({state.aspect_ratio.value})..."
+                    state.message = f"Processing clip {part_num}/{total_clips} ({state.aspect_ratio.value})..."
                     state.updated_at = datetime.now(timezone.utc)
 
-                # Cleanup intermediate raw split clips to save disk space
-                try:
-                    for raw_c in generated_clip_paths:
-                        if raw_c.exists():
-                            raw_c.unlink()
-                    logger.info(f"[Job {job_id}] Intermediate raw split clips cleaned up successfully.")
-                except Exception as clean_err:
-                    logger.warning(f"[Job {job_id}] Failed to cleanup intermediate split clips: {clean_err}")
-
-                final_clip_paths = branded_clip_paths
+                final_clip_paths = formatted_clip_paths
             else:
-                logger.info(f"[Job {job_id}] No channel branding or aspect ratio change requested. Using raw split clips.")
-                # Update segment filenames relative to job directory
+                logger.info(f"[Job {job_id}] Original 1:1 aspect ratio requested. Using zero-reencode raw split clips.")
+                final_clip_paths = generated_clip_paths
                 for seg in state.segments:
                     seg.filename = f"clips/{seg.filename}"
 
