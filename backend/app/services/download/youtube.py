@@ -78,6 +78,9 @@ class YouTubeDownloader(BaseDownloader):
             "extractor_args": {
                 "youtube": {
                     "player_client": ["mweb", "android", "web"],
+                },
+                "generic": {
+                    "impersonate": ["default"]
                 }
             },
             "http_headers": {
