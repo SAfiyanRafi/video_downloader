@@ -58,6 +58,11 @@ class YouTubeDownloader(BaseDownloader):
                     pct = (downloaded_bytes / total_bytes) * 100.0
                     progress_callback(min(pct, 99.0))
 
+        from urllib.parse import urlparse
+        parsed_url = urlparse(source)
+        netloc = parsed_url.netloc or "aniwatch.co.at"
+        scheme = parsed_url.scheme or "https"
+
         ydl_opts = {
             "format": format_selector,
             "format_sort": ["res", "fps", "hdr:12", "vcodec:h264", "acodec:m4a", "size", "br"],
@@ -77,7 +82,9 @@ class YouTubeDownloader(BaseDownloader):
             },
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9"
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": f"{scheme}://{netloc}/",
+                "Origin": f"{scheme}://{netloc}"
             },
             "progress_hooks": [_yt_dlp_progress_hook],
             "ffmpeg_location": ffmpeg_location,

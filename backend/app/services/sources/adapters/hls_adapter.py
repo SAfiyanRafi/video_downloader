@@ -60,10 +60,15 @@ class HlsAdapter(BaseSourceAdapter):
             logger.warning(f"[HlsAdapter] yt-dlp HLS download failed: {e}. Falling back to FFmpeg stream copy...")
 
         # Tier 2: Fallback to FFmpeg stream copy
+        from urllib.parse import urlparse
+        parsed_url = urlparse(url)
+        netloc = parsed_url.netloc or "aniwatch.co.at"
+        scheme = parsed_url.scheme or "https"
+
         cmd = [
             self.ffmpeg_bin, "-y",
             "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "-headers", "Referer: https://aniwatch.co.at/\r\n",
+            "-headers", f"Referer: {scheme}://{netloc}/\r\n",
             "-i", url,
             "-c", "copy",
             str(out_file)
