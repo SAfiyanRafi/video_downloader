@@ -2,7 +2,7 @@ import re
 import asyncio
 import logging
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 from app.models.source import MediaMetadata, SourceType
 from app.services.sources.base_adapter import BaseSourceAdapter
 from app.services.download.youtube import YouTubeDownloader
@@ -55,7 +55,12 @@ class YouTubeAdapter(BaseSourceAdapter):
                 filename="youtube_video.mp4"
             )
 
-    async def import_media(self, source: str, target_dir: Path) -> Path:
+    async def import_media(
+        self,
+        source: str,
+        target_dir: Path,
+        progress_callback: Optional[Callable[[float], None]] = None
+    ) -> Path:
         target_dir.mkdir(parents=True, exist_ok=True)
-        out_file = await self.yt_service.download(source.strip(), target_dir)
+        out_file = await self.yt_service.download(source.strip(), target_dir, progress_callback=progress_callback)
         return Path(out_file).resolve()

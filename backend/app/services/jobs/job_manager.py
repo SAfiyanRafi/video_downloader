@@ -180,17 +180,18 @@ class JobManager:
         try:
             # 1. DOWNLOADING STAGE (0% -> 40%)
             state.status = JobStatus.DOWNLOADING
-            state.message = "Downloading video from YouTube..."
+            state.message = "Importing & downloading media from source..."
             state.updated_at = datetime.now(timezone.utc)
 
             def _download_progress(pct: float):
                 # Scale download progress into 0-40% total job progress
-                state.progress = (pct / 100.0) * 40.0
+                state.progress = max(state.progress, round((pct / 100.0) * 40.0, 1))
                 state.updated_at = datetime.now(timezone.utc)
 
             import_result = await source_manager.import_source(
                 source=state.url,
-                target_dir=job_dir
+                target_dir=job_dir,
+                progress_callback=_download_progress
             )
             downloaded_video = Path(import_result.local_path)
             state.progress = 40.0

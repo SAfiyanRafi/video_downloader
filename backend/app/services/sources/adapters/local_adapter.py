@@ -2,7 +2,7 @@ import shutil
 import asyncio
 import logging
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 from app.models.source import MediaMetadata, SourceType
 from app.services.sources.base_adapter import BaseSourceAdapter
 from app.services.processing.ffmpeg_service import get_ffmpeg_executable
@@ -43,7 +43,12 @@ class LocalAdapter(BaseSourceAdapter):
             duration=0.0
         )
 
-    async def import_media(self, source: str, target_dir: Path) -> Path:
+    async def import_media(
+        self,
+        source: str,
+        target_dir: Path,
+        progress_callback: Optional[Callable[[float], None]] = None
+    ) -> Path:
         src_path = Path(source.strip()).resolve()
         if not src_path.exists():
             raise FileNotFoundError(f"Local file not found at {src_path}")

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 from app.models.source import MediaMetadata, SourceType
 from app.services.sources.base_adapter import BaseSourceAdapter
 from app.services.processing.ffmpeg_service import get_ffmpeg_executable
@@ -38,7 +38,12 @@ class DashAdapter(BaseSourceAdapter):
             filename=filename
         )
 
-    async def import_media(self, source: str, target_dir: Path) -> Path:
+    async def import_media(
+        self,
+        source: str,
+        target_dir: Path,
+        progress_callback: Optional[Callable[[float], None]] = None
+    ) -> Path:
         target_dir.mkdir(parents=True, exist_ok=True)
         url = source.strip()
         out_file = target_dir / "dash_stream.mp4"

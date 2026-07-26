@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 from app.models.source import MediaMetadata, SourceType
 
 class BaseSourceAdapter(ABC):
@@ -29,6 +29,11 @@ class BaseSourceAdapter(ABC):
         pass
 
     @abstractmethod
-    async def import_media(self, source: str, target_dir: Path) -> Path:
+    async def import_media(
+        self,
+        source: str,
+        target_dir: Path,
+        progress_callback: Optional[Callable[[float], None]] = None
+    ) -> Path:
         """Imports or downloads the source into a local playable video file."""
         pass

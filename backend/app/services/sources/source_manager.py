@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Callable
 from app.models.source import MediaMetadata, SourceType, ImportResult
 from app.services.sources.base_adapter import BaseSourceAdapter
 from app.services.sources.adapters.youtube_adapter import YouTubeAdapter
@@ -47,7 +47,12 @@ class SourceManager:
         except ValueError as e:
             return False, str(e)
 
-    async def import_source(self, source: str, target_dir: Path) -> ImportResult:
+    async def import_source(
+        self,
+        source: str,
+        target_dir: Path,
+        progress_callback: Optional[Callable[[float], None]] = None
+    ) -> ImportResult:
         adapter = self.get_adapter(source)
         logger.info(f"[SourceManager] Selected adapter '{adapter.__class__.__name__}' for source: {source}")
 
@@ -55,7 +60,7 @@ class SourceManager:
         if not valid:
             raise ValueError(f"Source validation failed: {err}")
 
-        local_file = await adapter.import_media(source, target_dir)
+        local_file = await adapter.import_media(source, target_dir, progress_callback=progress_callback)
         meta = await adapter.probe(source)
 
         return ImportResult(
