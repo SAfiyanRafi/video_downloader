@@ -46,6 +46,8 @@ class HlsAdapter(BaseSourceAdapter):
     ) -> Path:
         target_dir.mkdir(parents=True, exist_ok=True)
         url = source.strip()
+        out_file = target_dir / "hls_stream.mp4"
+
         # Tier 1: Try yt-dlp first (best HLS playlist handling & 16-thread speed)
         from app.services.download.youtube import YouTubeDownloader
         try:
