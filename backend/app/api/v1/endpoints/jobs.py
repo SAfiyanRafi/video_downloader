@@ -39,8 +39,7 @@ async def create_job(request: JobCreateRequest):
             export_preset=request.export_preset,
             padding_mode=request.padding_mode,
             naming_template=request.naming_template,
-            crop_fill=request.crop_fill,
-            channel=request.channel
+            crop_fill=request.crop_fill
         )
     except (KeyError, FileNotFoundError) as e:
         raise HTTPException(
