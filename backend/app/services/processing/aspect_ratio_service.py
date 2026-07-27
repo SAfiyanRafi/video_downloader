@@ -33,13 +33,17 @@ class AspectRatioService:
         if not clip_path.exists():
             raise FileNotFoundError(f"Input clip not found at {clip_path}")
 
-        # If ORIGINAL, skip encoding entirely and perform lossless copy
+        # If ORIGINAL, skip encoding entirely and perform lossless copy with clean stream mapping
         if aspect_ratio == AspectRatioOption.ORIGINAL:
             logger.info(f"[AspectRatioService] Aspect ratio is ORIGINAL. Performing 0-second lossless copy for {clip_path.name}")
             cmd = [
                 self.ffmpeg_bin, "-y",
                 "-i", str(clip_path.resolve()),
-                "-c", "copy",
+                "-map", "0:v:0",
+                "-map", "0:a:0?",
+                "-c:v", "copy",
+                "-c:a", "copy",
+                "-movflags", "+faststart",
                 str(output_path.resolve())
             ]
             returncode, _, err = await asyncio.to_thread(_exec_subprocess, cmd)
@@ -73,13 +77,16 @@ class AspectRatioService:
             self.ffmpeg_bin, "-y",
             "-i", str(clip_path.resolve()),
             "-filter_complex", filter_complex,
+            "-map", "0:a:0?",
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-threads", "0",
             "-tune", "fastdecode",
+            "-pix_fmt", "yuv420p",
             "-crf", "23",
             "-c:a", "aac",
             "-b:a", "192k",
+            "-movflags", "+faststart",
             str(output_path.resolve())
         ]
 

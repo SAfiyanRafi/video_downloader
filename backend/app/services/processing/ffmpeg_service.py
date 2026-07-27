@@ -40,8 +40,12 @@ class FFmpegService:
                 "-ss", str(segment.start_time),
                 "-to", str(segment.end_time),
                 "-i", str(input_file),
-                "-c", "copy",
+                "-map", "0:v:0",
+                "-map", "0:a:0?",
+                "-c:v", "copy",
+                "-c:a", "copy",
                 "-avoid_negative_ts", "make_zero",
+                "-movflags", "+faststart",
                 str(clip_path)
             ]
 
@@ -60,9 +64,14 @@ class FFmpegService:
                     "-ss", str(segment.start_time),
                     "-to", str(segment.end_time),
                     "-i", str(input_file),
+                    "-map", "0:v:0",
+                    "-map", "0:a:0?",
                     "-c:v", "libx264",
                     "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p",
                     "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-movflags", "+faststart",
                     str(clip_path)
                 ]
                 def _run_fallback(fc=fallback_cmd):
