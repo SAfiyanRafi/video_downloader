@@ -21,11 +21,7 @@ class YouTubeAdapter(BaseSourceAdapter):
         s = source.strip().lower()
         if not (s.startswith("http://") or s.startswith("https://")):
             return False
-        if ".m3u8" in s or ".mpd" in s:
-            return False
-        if any(s.endswith(ext) or f"{ext}?" in s for ext in [".mp4", ".mov", ".mkv", ".webm", ".avi"]):
-            return False
-        return True
+        return "youtube.com" in s or "youtu.be" in s
 
     def validate(self, source: str) -> Tuple[bool, Optional[str]]:
         s = source.strip().lower()

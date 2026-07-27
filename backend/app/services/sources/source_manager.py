@@ -22,9 +22,9 @@ class SourceManager:
             YouTubeAdapter(),
             HlsAdapter(),
             DashAdapter(),
+            BrowserAdapter(),
             DirectUrlAdapter(),
             LocalAdapter(),
-            BrowserAdapter(),
         ]
 
     def register_adapter(self, adapter: BaseSourceAdapter):
