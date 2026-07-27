@@ -49,12 +49,14 @@ class JobState:
         self.status = JobStatus.PENDING
         self.progress = 0.0
         self.message = "Job queued"
+        self.error: Optional[str] = None
         self.created_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
 
         self.metadata: Optional[VideoMetadata] = None
         self.segments: List[SegmentInfo] = []
         self.zip_path: Optional[str] = None
+        self.zip_filename: Optional[str] = None
         self.download_url: Optional[str] = None
         self.task: Optional[asyncio.Task] = None
 
@@ -136,8 +138,7 @@ class JobManager:
             error=state.error,
             metadata=state.metadata,
             url=state.url,
-            parts=state.parts,
-            channel=state.channel
+            parts=state.parts
         )
 
     def get_job_downloads(self, job_id: str) -> JobDownloadsResponse:
