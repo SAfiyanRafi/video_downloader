@@ -62,10 +62,10 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
 
   const isValidMediaSource = (u: string) => {
     const s = u.trim();
+    if (selectedFile) return true;
     if (!s) return false;
-    if (/^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/.+/i.test(s)) return true;
     if (s.startsWith('http://') || s.startsWith('https://')) return true;
-    if (s.length > 3 && (s.endsWith('.mp4') || s.endsWith('.mov') || s.endsWith('.mkv') || s.endsWith('.webm'))) return true;
+    if (s.length >= 1) return true;
     return false;
   };
 
@@ -73,7 +73,10 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
 
   const getSourceBadge = (u: string) => {
     const s = u.trim().toLowerCase();
-    if (!s) return null;
+    if (!s && !selectedFile) return null;
+    if (selectedFile || (!s.startsWith('http://') && !s.startsWith('https://'))) {
+      return { label: '📁 Local Media File (All Formats)', color: 'bg-amber-500/20 text-amber-300' };
+    }
     if (s.includes('youtube.com') || s.includes('youtu.be')) {
       return { label: '📺 YouTube Video', color: 'bg-red-500/20 text-red-300' };
     }
@@ -83,11 +86,8 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
     if (s.includes('.mpd')) {
       return { label: '📊 DASH Stream (.mpd)', color: 'bg-indigo-500/20 text-indigo-300' };
     }
-    if (s.endsWith('.mp4') || s.endsWith('.mov') || s.endsWith('.mkv') || s.endsWith('.webm')) {
-      if (s.startsWith('http://') || s.startsWith('https://')) {
-        return { label: '🌐 Direct Video Link', color: 'bg-emerald-500/20 text-emerald-300' };
-      }
-      return { label: '📁 Local Media File', color: 'bg-amber-500/20 text-amber-300' };
+    if (s.startsWith('http://') || s.startsWith('https://')) {
+      return { label: '🌐 Web / Direct Link', color: 'bg-emerald-500/20 text-emerald-300' };
     }
     return { label: '🎬 Media Source', color: 'bg-slate-800 text-gray-300' };
   };
@@ -162,7 +162,7 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
                 setUrlTouched(true);
               }
             }}
-            accept="video/*,.mp4,.mov,.mkv,.avi,.webm,.flv"
+            accept="video/*,*"
             className="hidden"
           />
 

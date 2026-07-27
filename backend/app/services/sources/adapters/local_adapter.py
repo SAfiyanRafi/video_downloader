@@ -11,7 +11,6 @@ from app.utils.process_utils import _exec_subprocess
 logger = logging.getLogger("yt_splitter")
 
 class LocalAdapter(BaseSourceAdapter):
-    SUPPORTED_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv"}
 
     def __init__(self):
         self.ffmpeg_bin = get_ffmpeg_executable()
@@ -21,18 +20,22 @@ class LocalAdapter(BaseSourceAdapter):
         return SourceType.LOCAL_FILE
 
     def supports(self, source: str) -> bool:
-        p = Path(source.strip())
-        return p.is_file() and p.suffix.lower() in self.SUPPORTED_EXTS
+        try:
+            p = Path(source.strip())
+            return p.exists() and p.is_file()
+        except Exception:
+            return False
 
     def validate(self, source: str) -> Tuple[bool, Optional[str]]:
-        p = Path(source.strip())
-        if not p.exists():
-            return False, f"Local file not found: {source}"
-        if not p.is_file():
-            return False, f"Path is a directory, not a file: {source}"
-        if p.suffix.lower() not in self.SUPPORTED_EXTS:
-            return False, f"Unsupported file extension: {p.suffix}"
-        return True, None
+        try:
+            p = Path(source.strip())
+            if not p.exists():
+                return False, f"Local file not found: {source}"
+            if not p.is_file():
+                return False, f"Path is a directory, not a file: {source}"
+            return True, None
+        except Exception as e:
+            return False, f"Invalid local file path: {e}"
 
     async def probe(self, source: str) -> MediaMetadata:
         p = Path(source.strip()).resolve()
