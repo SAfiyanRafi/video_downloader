@@ -154,8 +154,15 @@ class StudioManager:
                 cmd.extend(["-af", audio_filter])
 
             cmd.extend([
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-                "-c:a", "aac", "-b:a", "256k",
+                "-map", "0:v:0",
+                "-map", "0:a:0?",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                "-b:a", "256k",
+                "-movflags", "+faststart",
                 str(output_video)
             ])
 

@@ -356,8 +356,28 @@ export const StudioDashboard: React.FC = () => {
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Upload Ready Video Generated</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-slate-900 border border-gray-800 text-[11px] font-mono text-gray-300 break-all">
-                      {activeJob.output_video_path}
+                    <div className="p-3 rounded-xl bg-slate-900 border border-gray-800 text-[11px] font-mono text-gray-300 break-all space-y-2">
+                      <div>Saved to: {activeJob.output_video_path}</div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <a
+                          href={`http://localhost:8000/api/v1/studio/jobs/${activeJob.job_id}/download/video`}
+                          download
+                          className="px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs flex items-center space-x-1.5 transition-all shadow-md"
+                        >
+                          <Film className="w-3.5 h-3.5" />
+                          <span>Download Enhanced Video MP4</span>
+                        </a>
+                        {activeJob.srt_path && (
+                          <a
+                            href={`http://localhost:8000/api/v1/studio/jobs/${activeJob.job_id}/download/srt`}
+                            download
+                            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-200 font-semibold text-xs flex items-center space-x-1.5 transition-all border border-gray-700"
+                          >
+                            <Type className="w-3.5 h-3.5 text-pink-400" />
+                            <span>Download SRT Subtitles</span>
+                          </a>
+                        )}
+                      </div>
                     </div>
 
                     <AIUploadHelper
