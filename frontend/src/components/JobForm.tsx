@@ -18,7 +18,8 @@ interface JobFormProps {
     exportPreset: ExportPreset,
     paddingMode: PaddingMode,
     namingTemplate: NamingTemplate,
-    cropFill: boolean
+    cropFill: boolean,
+    selectedFile?: File
   ) => void;
   isLoading: boolean;
   error?: string | null;
@@ -33,9 +34,11 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const [paddingMode, setPaddingMode] = useState<PaddingMode>('black_bars');
   const [namingTemplate, setNamingTemplate] = useState<NamingTemplate>('{original}_Clip_{number}');
   const [cropFill, setCropFill] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [urlTouched, setUrlTouched] = useState(false);
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('custom');
   const [workflows, setWorkflows] = useState<WorkflowProfile[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchWorkflows().then((data) => {
@@ -94,10 +97,10 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setUrlTouched(true);
-    if (!isUrlValid) return;
+    if (!selectedFile && !url.trim()) return;
     onSubmit(
       url.trim(), parts, quality, aspectRatio,
-      exportPreset, paddingMode, namingTemplate, cropFill
+      exportPreset, paddingMode, namingTemplate, cropFill, selectedFile || undefined
     );
   };
 
@@ -148,23 +151,50 @@ export const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, error }) 
             )}
           </div>
 
-          <div className="relative">
-            <input
-              id="media-source-input"
-              type="text"
-              value={url}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                if (!urlTouched) setUrlTouched(true);
-              }}
-              placeholder="Paste YouTube URL, Direct Video Link (.mp4), HLS (.m3u8), DASH (.mpd), or Local Path"
-              className={`w-full min-h-[48px] px-4 py-3 rounded-xl bg-slate-900/90 border ${
-                urlTouched && !isUrlValid && url
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-gray-700/80 focus:border-rose-500 focus:ring-rose-500'
-              } text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all font-mono text-xs sm:text-sm`}
-              aria-invalid={urlTouched && !isUrlValid}
-            />
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setSelectedFile(file);
+                setUrl(file.name);
+                setUrlTouched(true);
+              }
+            }}
+            accept="video/*,.mp4,.mov,.mkv,.avi,.webm,.flv"
+            className="hidden"
+          />
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <input
+                id="media-source-input"
+                type="text"
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  setSelectedFile(null);
+                  if (!urlTouched) setUrlTouched(true);
+                }}
+                placeholder="Paste YouTube URL, Direct Video Link (.mp4), HLS (.m3u8), or Local Disk Path"
+                className={`w-full min-h-[48px] px-4 py-3 rounded-xl bg-slate-900/90 border ${
+                  urlTouched && !isUrlValid && url && !selectedFile
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-gray-700/80 focus:border-rose-500 focus:ring-rose-500'
+                } text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all font-mono text-xs sm:text-sm`}
+                aria-invalid={urlTouched && !isUrlValid && !selectedFile}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-4 py-3 min-h-[48px] rounded-xl bg-slate-900 border border-gray-700 hover:border-amber-500 hover:text-amber-300 text-gray-300 font-semibold text-xs flex items-center justify-center space-x-2 transition-all shrink-0 cursor-pointer shadow-sm"
+            >
+              <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{selectedFile ? 'Change File' : '📁 Browse Local File'}</span>
+            </button>
           </div>
 
           {urlTouched && !isUrlValid && url && (

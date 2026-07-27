@@ -49,6 +49,46 @@ export async function createSplitJob(
   }
 }
 
+export async function uploadLocalFileSplitJob(
+  file: File,
+  parts: number = 4,
+  quality: QualityOption = 'best',
+  aspectRatio: AspectRatioOption = 'original',
+  exportPreset: ExportPreset = 'high_quality',
+  paddingMode: PaddingMode = 'black_bars',
+  namingTemplate: NamingTemplate = '{original}_Clip_{number}',
+  cropFill: boolean = false
+): Promise<JobResponse> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('parts', parts.toString());
+    formData.append('quality', quality);
+    formData.append('aspect_ratio', aspectRatio);
+    formData.append('export_preset', exportPreset);
+    formData.append('padding_mode', paddingMode);
+    formData.append('naming_template', namingTemplate);
+    formData.append('crop_fill', cropFill ? 'true' : 'false');
+
+    const response = await fetch(`${API_BASE}/jobs/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Failed to upload local file for splitting');
+    }
+
+    return response.json();
+  } catch (err: any) {
+    if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
+      throw new Error('Backend server disconnected. Please verify Uvicorn server is running on http://localhost:8000.');
+    }
+    throw err;
+  }
+}
+
 export async function fetchJobStatus(jobId: string): Promise<JobResponse> {
   try {
     const response = await fetch(`${API_BASE}/jobs/${jobId}`);

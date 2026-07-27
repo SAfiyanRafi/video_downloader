@@ -52,6 +52,51 @@ async def create_job(request: JobCreateRequest):
             detail=f"Failed to create job: {str(e)}"
         )
 
+from fastapi import File, UploadFile, Form
+import shutil
+import uuid
+from app.models.job import QualityOption, AspectRatioOption, ExportPreset, PaddingMode, NamingTemplate
+
+@router.post("/upload", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
+async def upload_job(
+    file: UploadFile = File(...),
+    parts: int = Form(default=4),
+    quality: QualityOption = Form(default=QualityOption.BEST),
+    aspect_ratio: AspectRatioOption = Form(default=AspectRatioOption.ORIGINAL),
+    export_preset: ExportPreset = Form(default=ExportPreset.HIGH),
+    padding_mode: PaddingMode = Form(default=PaddingMode.BLACK_BARS),
+    naming_template: NamingTemplate = Form(default=NamingTemplate.CHANNEL_PART),
+    crop_fill: bool = Form(default=False)
+):
+    """
+    Uploads a local video file directly for instant multi-part splitting.
+    """
+    uploads_dir = Path("temp/uploads")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    
+    unique_filename = f"{uuid.uuid4().hex[:8]}_{file.filename}"
+    dest_path = uploads_dir / unique_filename
+
+    with open(dest_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    try:
+        return job_manager.create_job(
+            url=str(dest_path.resolve()),
+            parts=parts,
+            quality=quality,
+            aspect_ratio=aspect_ratio,
+            export_preset=export_preset,
+            padding_mode=padding_mode,
+            naming_template=naming_template,
+            crop_fill=crop_fill
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to process uploaded file: {str(e)}"
+        )
+
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job_status(job_id: str):
     """

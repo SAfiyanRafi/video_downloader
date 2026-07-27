@@ -11,7 +11,7 @@ import type {
   JobResponse, JobDownloadsResponse, QualityOption, AspectRatioOption,
   ExportPreset, PaddingMode, NamingTemplate
 } from './types/job';
-import { createSplitJob, fetchJobStatus, fetchJobDownloads, cancelSplitJob } from './services/api';
+import { createSplitJob, uploadLocalFileSplitJob, fetchJobStatus, fetchJobDownloads, cancelSplitJob } from './services/api';
 
 const ACTIVE_JOB_KEY = 'splittube_active_job_id';
 const HISTORY_KEY = 'splittube_job_history';
@@ -111,15 +111,24 @@ export const App: React.FC = () => {
     exportPreset: ExportPreset,
     paddingMode: PaddingMode,
     namingTemplate: NamingTemplate,
-    cropFill: boolean
+    cropFill: boolean,
+    selectedFile?: File
   ) => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const job = await createSplitJob(
-        url, parts, quality, aspectRatio,
-        exportPreset, paddingMode, namingTemplate, cropFill
-      );
+      let job: JobResponse;
+      if (selectedFile) {
+        job = await uploadLocalFileSplitJob(
+          selectedFile, parts, quality, aspectRatio,
+          exportPreset, paddingMode, namingTemplate, cropFill
+        );
+      } else {
+        job = await createSplitJob(
+          url, parts, quality, aspectRatio,
+          exportPreset, paddingMode, namingTemplate, cropFill
+        );
+      }
       setCurrentJob(job);
       setDownloads(null);
       localStorage.setItem(ACTIVE_JOB_KEY, job.job_id);
