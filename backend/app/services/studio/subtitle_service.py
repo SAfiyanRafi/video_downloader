@@ -120,6 +120,7 @@ class SubtitleService:
 
         # Style definition map
         # PrimaryColour: &H00BBGGRR (Alpha, Blue, Green, Red in hex)
+        # MarginV is calibrated to 700 for 1080x1920 canvas so captions sit inside the active video playing frame, not the letterbox blur.
         styles = {
             SubtitleStylePreset.TIKTOK: {
                 "font": "Arial",
@@ -128,8 +129,8 @@ class SubtitleService:
                 "outline_color": "&H00000000",
                 "outline": 4,
                 "shadow": 1,
-                "alignment": 2, # Bottom Center
-                "margin_v": 80
+                "alignment": 2, # Bottom Center of active video frame
+                "margin_v": 700
             },
             SubtitleStylePreset.MRBEAST: {
                 "font": "Impact",
@@ -138,7 +139,7 @@ class SubtitleService:
                 "outline_color": "&H00000000",
                 "outline": 5,
                 "shadow": 2,
-                "alignment": 5, # Center
+                "alignment": 5, # Dead Center of active video frame
                 "margin_v": 0
             },
             SubtitleStylePreset.GAMING: {
@@ -149,7 +150,7 @@ class SubtitleService:
                 "outline": 3,
                 "shadow": 1,
                 "alignment": 2,
-                "margin_v": 60
+                "margin_v": 680
             },
             SubtitleStylePreset.PODCAST: {
                 "font": "Helvetica",
@@ -159,7 +160,7 @@ class SubtitleService:
                 "outline": 2,
                 "shadow": 0,
                 "alignment": 2,
-                "margin_v": 70
+                "margin_v": 720
             },
             SubtitleStylePreset.MINIMAL: {
                 "font": "Arial",
@@ -169,7 +170,7 @@ class SubtitleService:
                 "outline": 2,
                 "shadow": 1,
                 "alignment": 2,
-                "margin_v": 50
+                "margin_v": 690
             }
         }
 
