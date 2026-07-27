@@ -10,6 +10,38 @@ from app.utils.process_utils import _exec_subprocess
 
 logger = logging.getLogger("yt_splitter")
 
+import os
+
+def resolve_local_path(source: str) -> Path:
+    clean = source.strip().strip('"').strip("'")
+    if not clean:
+        return Path(clean)
+    
+    p = Path(clean)
+    if p.exists() and p.is_file():
+        return p.resolve()
+
+    # Search common user directories on Windows
+    user_profile = os.environ.get("USERPROFILE", "C:\\Users\\ABC")
+    common_dirs = [
+        Path(user_profile) / "OneDrive" / "Desktop",
+        Path(user_profile) / "Desktop",
+        Path(user_profile) / "OneDrive" / "Desktop" / "Youtube" / "Download",
+        Path(user_profile) / "Downloads",
+        Path(user_profile) / "Videos",
+    ]
+
+    ext_candidates = ["", ".ts", ".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv"]
+
+    for base_dir in common_dirs:
+        for ext in ext_candidates:
+            target = base_dir / f"{clean}{ext}"
+            if target.exists() and target.is_file():
+                logger.info(f"[LocalAdapter] Auto-resolved '{source}' -> {target.resolve()}")
+                return target.resolve()
+
+    return p
+
 class LocalAdapter(BaseSourceAdapter):
 
     def __init__(self):
@@ -21,28 +53,31 @@ class LocalAdapter(BaseSourceAdapter):
 
     def supports(self, source: str) -> bool:
         try:
-            p = Path(source.strip())
-            return p.exists() and p.is_file()
+            s = source.strip().strip('"').strip("'")
+            if s.startswith("http://") or s.startswith("https://"):
+                return False
+            resolved = resolve_local_path(s)
+            return resolved.exists() and resolved.is_file()
         except Exception:
             return False
 
     def validate(self, source: str) -> Tuple[bool, Optional[str]]:
         try:
-            p = Path(source.strip())
-            if not p.exists():
-                return False, f"Local file not found: {source}"
-            if not p.is_file():
-                return False, f"Path is a directory, not a file: {source}"
+            resolved = resolve_local_path(source)
+            if not resolved.exists():
+                return False, f"Local file not found: '{source}'. Please verify file path or use 'Browse Local File'."
+            if not resolved.is_file():
+                return False, f"Path is a directory, not a file: '{source}'"
             return True, None
         except Exception as e:
             return False, f"Invalid local file path: {e}"
 
     async def probe(self, source: str) -> MediaMetadata:
-        p = Path(source.strip()).resolve()
+        resolved = resolve_local_path(source)
         return MediaMetadata(
             source_type=SourceType.LOCAL_FILE,
-            source_uri=str(p),
-            filename=p.name,
+            source_uri=str(resolved),
+            filename=resolved.name,
             duration=0.0
         )
 
@@ -52,13 +87,13 @@ class LocalAdapter(BaseSourceAdapter):
         target_dir: Path,
         progress_callback: Optional[Callable[[float], None]] = None
     ) -> Path:
-        src_path = Path(source.strip()).resolve()
-        if not src_path.exists():
-            raise FileNotFoundError(f"Local file not found at {src_path}")
+        resolved = resolve_local_path(source)
+        if not resolved.exists():
+            raise FileNotFoundError(f"Local file not found at {resolved}")
 
         target_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = target_dir / src_path.name
-        if src_path != dest_path:
-            shutil.copy2(src_path, dest_path)
+        dest_path = target_dir / resolved.name
+        if resolved != dest_path:
+            shutil.copy2(resolved, dest_path)
 
         return dest_path
