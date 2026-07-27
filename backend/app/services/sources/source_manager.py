@@ -8,6 +8,7 @@ from app.services.sources.adapters.local_adapter import LocalAdapter
 from app.services.sources.adapters.direct_url_adapter import DirectUrlAdapter
 from app.services.sources.adapters.hls_adapter import HlsAdapter
 from app.services.sources.adapters.dash_adapter import DashAdapter
+from app.services.sources.adapters.browser_adapter import BrowserAdapter
 
 logger = logging.getLogger("yt_splitter")
 
@@ -23,6 +24,7 @@ class SourceManager:
             DashAdapter(),
             DirectUrlAdapter(),
             LocalAdapter(),
+            BrowserAdapter(),
         ]
 
     def register_adapter(self, adapter: BaseSourceAdapter):

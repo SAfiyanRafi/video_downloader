@@ -9,6 +9,7 @@ class SourceType(str, Enum):
     HLS = "hls"
     DASH = "dash"
     YOUTUBE = "youtube"
+    WEB_PAGE = "web_page"
 
 class MediaMetadata(BaseModel):
     source_type: SourceType
