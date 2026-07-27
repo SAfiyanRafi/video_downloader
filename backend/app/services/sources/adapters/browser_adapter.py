@@ -65,6 +65,13 @@ class BrowserAdapter(BaseSourceAdapter):
         captured_cookies = []
 
         try:
+            import sys
+            if sys.platform == "win32":
+                try:
+                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                except Exception:
+                    pass
+
             from playwright.async_api import async_playwright
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
