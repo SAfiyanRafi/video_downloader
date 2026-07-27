@@ -7,7 +7,51 @@ from urllib.parse import urlparse
 from app.models.source import MediaMetadata, SourceType
 from app.services.sources.base_adapter import BaseSourceAdapter
 
-logger = logging.getLogger("yt_splitter")
+def _inspect_page_sync(url: str) -> Tuple[List[str], List[dict]]:
+    import sys
+    if sys.platform == "win32":
+        try:
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        except Exception:
+            pass
+
+    from playwright.sync_api import sync_playwright
+    captured_m3u8_urls = []
+    captured_cookies = []
+
+    logger.info(f"[BrowserAdapter] Launching sync Playwright Chromium in thread: {url}")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
+        )
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            viewport={"width": 1920, "height": 1080}
+        )
+        page = context.new_page()
+
+        def handle_request(req):
+            req_url = req.url
+            if ".m3u8" in req_url and req_url not in captured_m3u8_urls:
+                logger.info(f"[BrowserAdapter] Intercepted HLS stream: {req_url[:120]}")
+                captured_m3u8_urls.append(req_url)
+
+        page.on("request", handle_request)
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            page.wait_for_timeout(3000)
+        except Exception as nav_err:
+            logger.warning(f"[BrowserAdapter] Page navigation timeout/warning: {nav_err}")
+
+        try:
+            captured_cookies = context.cookies()
+        except Exception:
+            pass
+
+        browser.close()
+
+    return captured_m3u8_urls, captured_cookies
 
 class BrowserAdapter(BaseSourceAdapter):
     """
@@ -65,39 +109,7 @@ class BrowserAdapter(BaseSourceAdapter):
         captured_cookies = []
 
         try:
-            import sys
-            if sys.platform == "win32":
-                try:
-                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-                except Exception:
-                    pass
-
-            from playwright.async_api import async_playwright
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
-                )
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    viewport={"width": 1920, "height": 1080}
-                )
-                page = await context.new_page()
-
-                def handle_request(req):
-                    req_url = req.url
-                    if ".m3u8" in req_url and req_url not in captured_m3u8_urls:
-                        logger.info(f"[BrowserAdapter] Intercepted HLS stream: {req_url[:120]}")
-                        captured_m3u8_urls.append(req_url)
-
-                page.on("request", handle_request)
-
-                logger.info(f"[BrowserAdapter] Navigating to {url}...")
-                await page.goto(url, wait_until="domcontentloaded", timeout=15000)
-                await asyncio.sleep(3.0)
-
-                captured_cookies = await context.cookies()
-                await browser.close()
+            captured_m3u8_urls, captured_cookies = await asyncio.to_thread(_inspect_page_sync, url)
         except Exception as e:
             logger.warning(f"[BrowserAdapter] Playwright execution error/fallback: {e}")
 
